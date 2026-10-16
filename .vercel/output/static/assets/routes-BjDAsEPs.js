@@ -1,1 +1,0 @@
-import{a as e,t}from"./useNavigate-CH9evgWe.js";var n=e(),r=()=>(0,n.jsx)(t,{to:`/marketplace`});export{r as component};

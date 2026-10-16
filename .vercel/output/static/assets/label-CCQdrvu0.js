@@ -1,1 +1,0 @@
-import{a as e,c as t}from"./useNavigate-CH9evgWe.js";import{s as n}from"./card-BQU3wRBA.js";t();var r=e();function i({className:e,...t}){return(0,r.jsx)(`label`,{className:n(`text-sm font-medium text-fg`,e),...t})}export{i as t};
