@@ -39,6 +39,9 @@ pnpm-debug.log*
 .node_modules.lock
 .grok
 screenshots
+artifacts
+AGENT.md
+attachments
 
 # OS and editor files
 .DS_Store
