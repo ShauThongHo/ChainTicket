@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #e9eeeb;
+  --color-bg-elevated: #f7f8f4;
+  --color-fg: #172b3a;
+  --color-muted: #5f7078;
+  --color-primary: #315b73;
+  --color-primary-fg: #f7f8f4;
+  --color-border: #c7d2cd;
+  --color-ink: #172b3a;
+  --color-paper: #f7f8f4;
+  --color-sage: #c4a35d;
+  --color-mist: #dde7e2;
+  --color-danger: #a34743;
+  --color-success: #416b58;
+  --color-stub: #f7f8f4;
+  --font-sans: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius-sm: 0.2rem;
+  --radius-md: 0.35rem;
+  --radius-lg: 0.45rem;
+  --radius-xl: 0.45rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.italic.font-display {
+  font-style: normal;
+}
+
+.stub {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 2px 8px 8px 2px;
+  background: var(--color-bg-elevated);
+  padding-left: 16px;
+}
+
+.stub::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 13px;
+  background:
+    radial-gradient(circle at 0 10px, var(--color-bg) 4px, transparent 4.5px) 0 0 / 14px 20px repeat-y,
+    var(--color-sage);
+}
+
+.stub-mark {
+  width: 16px;
+  height: 26px;
+  background: radial-gradient(circle at 0 7px, transparent 3px, var(--color-sage) 3.5px) 0 0 / 16px 10px repeat-y;
+}
+
+.stub::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 13px;
+  border-left: 1px dashed color-mix(in srgb, var(--color-fg) 22%, transparent);
+  pointer-events: none;
+}
+
+.chain-modal-backdrop {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.chain-modal-backdrop.is-visible {
+  opacity: 1;
+}
+
+.chain-modal-panel {
+  opacity: 0;
+  transform: translateY(6px) scale(0.99);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.chain-modal-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.hint-popover {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.hint-wrap:hover .hint-popover,
+.hint-popover.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-spin {
+    animation: none;
+  }
+  .chain-modal-backdrop,
+  .chain-modal-panel {
+    transition-duration: 1ms;
+  }
+}

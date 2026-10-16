@@ -1,0 +1,9 @@
+node_modules/
+.project_id
+.github_repo
+.env
+.env.*
+.data/
+*.pem
+infra.json
+operator-secrets.json
