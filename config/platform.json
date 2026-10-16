@@ -1,9 +1,0 @@
-{
-  "adminWallet": "0xE52A3EBcE46135CC10922Ee21494BBb12C82A921",
-  "chainName": "Gnosis Chiado",
-  "nativeSymbol": "xDAI",
-  "rpcUrl": "https://rpc.chiadochain.net",
-  "chainId": 10200,
-  "explorerUrl": "https://gnosis-chiado.blockscout.com",
-  "secretsPath": ".data/operator-secrets.json"
-}
