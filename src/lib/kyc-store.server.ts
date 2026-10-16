@@ -4,6 +4,7 @@ import { describeDatabaseUrl } from "@/lib/db";
 import { decodeAesKey, idHash, idLast4, newKycRef, normalizeId, openSeal, seal } from "@/lib/kyc-crypto";
 import { readKycPhoto, storeKycPhoto } from "@/lib/kyc-photo.server";
 import type { KycDetail, KycListRow, KycStatus } from "@/lib/types";
+import { isGnosisMainnet } from "@/lib/network-config";
 
 /**
  * Identity store.
@@ -197,6 +198,8 @@ async function keyMaterial(sql: Sql): Promise<KeyMaterial> {
 }
 
 export async function kycAutoApprove(sql: Sql) {
+  const { loadInfra } = await import("@/lib/infra.server");
+  if (isGnosisMainnet((await loadInfra(sql)).chainId)) return false;
   const flags = await sql<{ key: string; value: string }>`
     select key, value from infra_settings where key in ('dev_mode', 'kyc_auto_approve')
   `;

@@ -14,6 +14,7 @@ import { readPlatform } from "@/lib/platform";
 import { getSql } from "@/lib/db";
 import { loadInfra } from "@/lib/infra.server";
 import { RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS } from "@/lib/receipt";
+import { assertChainIdMatches, CHIADO_CHAIN_ID } from "@/lib/network-config";
 
 const globalRef = globalThis as typeof globalThis & {
   __ctLastChainError__?: string | null;
@@ -29,16 +30,17 @@ async function cfg() {
     rpcUrl: infra.rpcUrl || file.rpcUrl,
     chainId: infra.chainId || file.chainId,
     explorerUrl: infra.explorerUrl || file.explorerUrl,
-    nativeSymbol: file.nativeSymbol,
+    chainName: infra.chainName || file.chainName,
+    nativeSymbol: infra.nativeSymbol || file.nativeSymbol,
   };
 }
 
-function chainOf(chainId: number, rpcUrl: string, explorerUrl: string) {
+function chainOf(chainId: number, rpcUrl: string, explorerUrl: string, chainName?: string, nativeSymbol?: string) {
   const file = readPlatform();
   return defineChain({
     id: chainId,
-    name: file.chainName || "Ticket network",
-    nativeCurrency: { name: file.nativeSymbol, symbol: file.nativeSymbol, decimals: 18 },
+    name: chainName || file.chainName || "Ticket network",
+    nativeCurrency: { name: nativeSymbol || file.nativeSymbol, symbol: nativeSymbol || file.nativeSymbol, decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl] } },
     blockExplorers: { default: { name: "Explorer", url: explorerUrl || file.explorerUrl } },
   });
@@ -46,8 +48,10 @@ function chainOf(chainId: number, rpcUrl: string, explorerUrl: string) {
 
 export async function readClient() {
   const c = await cfg();
-  const chain = chainOf(c.chainId, c.rpcUrl, c.explorerUrl);
+  const chain = chainOf(c.chainId, c.rpcUrl, c.explorerUrl, c.chainName, c.nativeSymbol);
   const publicClient = createPublicClient({ chain, transport: http(c.rpcUrl, { timeout: 20_000 }) });
+  const actualChainId = await publicClient.getChainId();
+  assertChainIdMatches(c.chainId, actualChainId);
   return { c, chain, publicClient };
 }
 
@@ -70,7 +74,7 @@ export async function pingChain(rpcUrl?: string, chainId?: number) {
   const rpc = rpcUrl || infra.rpcUrl || file.rpcUrl;
   const id = chainId || infra.chainId || file.chainId;
   const client = createPublicClient({
-    chain: chainOf(id, rpc, infra.explorerUrl || file.explorerUrl),
+    chain: chainOf(id, rpc, infra.explorerUrl || file.explorerUrl, infra.chainName, infra.nativeSymbol),
     transport: http(rpc, { timeout: 10_000 }),
   });
   const [blockNumber, netId] = await Promise.all([client.getBlockNumber(), client.getChainId()]);
@@ -84,14 +88,14 @@ export async function pingChain(rpcUrl?: string, chainId?: number) {
   }
   globalRef.__ctLastChainError__ = null;
   return {
-    connected: true,
+    connected: netId === id,
     rpcUrl: rpc,
     chainId: netId,
     blockNumber: Number(blockNumber),
     operatorAddress,
     operatorBalance,
     explorerUrl: infra.explorerUrl || file.explorerUrl,
-    lastError: null as string | null,
+    lastError: netId === id ? null as string | null : `Configured chain ID ${id} does not match RPC chain ID ${netId}.`,
     lastAnchor: globalRef.__ctLastAnchor__ ?? null,
     demoBank: infra.demoBank || null,
     devMode: infra.devMode,
@@ -141,6 +145,7 @@ export function centsToWei(cents: number) {
 
 export async function deployDemoBank(admin: `0x${string}`) {
   const { account, wallet, publicClient } = await clients();
+  if (publicClient.chain?.id !== CHIADO_CHAIN_ID) throw new Error("Test DxDAI deployment is available on Chiado only; it is disabled on Gnosis mainnet.");
   const hash = await wallet.deployContract({
     abi: artifacts.DemoBank.abi,
     bytecode: artifacts.DemoBank.bytecode as Hex,
@@ -291,8 +296,37 @@ export async function setTierUriOnChain(opts: {
     account,
   });
   await wait(publicClient, hash);
+  let collection: `0x${string}`;
+  let actual: string;
+  try {
+    collection = await publicClient.readContract({
+      address: opts.marketplace,
+      abi: artifacts.EventMarketplace.abi,
+      functionName: "collection",
+    }) as `0x${string}`;
+    actual = await publicClient.readContract({
+      address: collection,
+      abi: artifacts.TicketCollection.abi,
+      functionName: "tierURI",
+      args: [opts.tierId],
+    }) as string;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "RPC read failed";
+    throw new Error(`Metadata URI readback failed after writing collection ${opts.marketplace}, tier ${opts.tierId}: ${detail}`);
+  }
+  if (actual !== opts.uri) throw new Error(`Metadata URI readback failed for collection ${collection}, tier ${opts.tierId}. Expected ${opts.uri}; got ${actual || "an empty URI"}.`);
   note(hash, "uri");
   return hash;
+}
+
+export async function readTicketTokenUri(collection: `0x${string}`, tokenId: number) {
+  const { publicClient } = await readClient();
+  return await publicClient.readContract({
+    address: collection,
+    abi: artifacts.TicketCollection.abi,
+    functionName: "tokenURI",
+    args: [BigInt(tokenId)],
+  }) as string;
 }
 
 export async function mintTierOnChain(opts: {

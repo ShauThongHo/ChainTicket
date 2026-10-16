@@ -1186,7 +1186,7 @@ export async function mintEvent(
     if (!meta.url && !meta.uri) throw new Error("Pinata returned an empty token URI.");
     metas.push(meta);
   }
-  const { deployEventContracts, mintTierOnChain, setTierUriOnChain } = await import("@/lib/chain.server");
+  const { deployEventContracts, mintTierOnChain, setTierUriOnChain, readTicketTokenUri } = await import("@/lib/chain.server");
   const royalty = (await sql<{ royalty_bps: number }>`select royalty_bps from platform_settings where id = 1`)[0];
   const bank = infra.devMode && infra.demoBank ? (infra.demoBank as `0x${string}`) : null;
   const deployed = await deployEventContracts({
@@ -1238,7 +1238,6 @@ export async function mintEvent(
     const meta = metas[i]!;
     const tierOnChain = chainId + 1;
     const tokenUri = meta.url || meta.uri;
-    ticketMetadata.push({ tierName: t.name.trim(), tokenUri, tokenId: chainId + 1 });
     const stageOffset = bank ? 7 : 6;
     await markStep(stageOffset + i * 2);
     await setTierUriOnChain({
@@ -1253,6 +1252,18 @@ export async function mintEvent(
       supply: t.supply,
       faceCents: t.faceCents,
     });
+    const firstTokenId = chainId + 1;
+    let actualTokenUri: string;
+    try {
+      actualTokenUri = await readTicketTokenUri(deployed.collection, firstTokenId);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "RPC read failed";
+      throw new Error(`Post-mint tokenURI verification failed for collection ${deployed.collection}, tier ${tierOnChain}, token ${firstTokenId}: ${detail}`);
+    }
+    if (actualTokenUri !== tokenUri) {
+      throw new Error(`Post-mint tokenURI mismatch for collection ${deployed.collection}, tier ${tierOnChain}, token ${firstTokenId}. Expected ${tokenUri}; got ${actualTokenUri || "an empty URI"}.`);
+    }
+    ticketMetadata.push({ tierName: t.name.trim(), tokenUri: actualTokenUri, tokenId: firstTokenId });
     const tier = (
       await sql<{ id: number }>`
         insert into ticket_tiers (event_id, name, face_cents, supply, contract_address)
@@ -2103,8 +2114,8 @@ export async function getInfraStatus(sql: Sql, wallet: string): Promise<InfraSta
   let chain: InfraStatus["chain"] = {
     rpcUrl: cfg.rpcUrl,
     chainId: cfg.chainId,
-    chainName: plat.chainName,
-    nativeSymbol: plat.nativeSymbol,
+    chainName: cfg.chainName || plat.chainName,
+    nativeSymbol: cfg.nativeSymbol || plat.nativeSymbol,
     connected: false,
     blockNumber: null,
     operatorAddress: null,
@@ -2125,12 +2136,12 @@ export async function getInfraStatus(sql: Sql, wallet: string): Promise<InfraSta
     const ping = await pingChain(cfg.rpcUrl, cfg.chainId);
     chain = {
       ...chain,
-      connected: true,
+      connected: ping.connected,
       blockNumber: ping.blockNumber,
-      chainId: ping.chainId,
+      chainId: cfg.chainId,
       operatorAddress: ping.operatorAddress,
       operatorBalance: ping.operatorBalance,
-      lastError: redactSecrets(lastChainError() ?? ""),
+      lastError: redactSecrets(ping.lastError || lastChainError() || ""),
       lastAnchor: lastAnchor(),
     };
   } catch (err) {
@@ -2180,6 +2191,8 @@ export async function applyInfra(
     databaseUrl?: string;
     rpcUrl?: string;
     chainId?: number;
+    chainName?: string;
+    nativeSymbol?: string;
     explorerUrl?: string;
     operatorPk?: string;
     pinataJwt?: string;
@@ -2194,7 +2207,13 @@ export async function applyInfra(
 ) {
   const me = await getMe(sql, wallet);
   if (!me.isAdmin) throw new Error("Admin only.");
-  const { saveInfra } = await import("@/lib/infra.server");
+  const { loadInfra, saveInfra } = await import("@/lib/infra.server");
+  if (patch.rpcUrl || patch.chainId) {
+    const { pingChain } = await import("@/lib/chain.server");
+    const current = await loadInfra(sql);
+    const ping = await pingChain(patch.rpcUrl ?? current.rpcUrl, patch.chainId ?? current.chainId);
+    if (!ping.connected) throw new Error(ping.lastError || "RPC chain ID does not match the selected network.");
+  }
   await saveInfra(sql, patch);
   invalidatePublicConfig();
   return getInfraStatus(await (await import("@/lib/db")).getSql(), wallet);
@@ -2231,11 +2250,11 @@ export async function publicConfig(): Promise<import("@/lib/types").PublicConfig
   const plat = readPlatform();
   const infra = await loadInfra(sql);
   const value: import("@/lib/types").PublicConfig = {
-    chainName: plat.chainName,
-    nativeSymbol: plat.nativeSymbol,
-    chainId: plat.chainId,
-    rpcUrl: plat.rpcUrl,
-    explorerUrl: plat.explorerUrl,
+    chainName: infra.chainName || plat.chainName,
+    nativeSymbol: infra.nativeSymbol || plat.nativeSymbol,
+    chainId: infra.chainId,
+    rpcUrl: infra.rpcUrl,
+    explorerUrl: infra.explorerUrl,
     adminConfigured: Boolean(plat.adminWallet),
     devMode: Boolean(infra.devMode),
     demoBank: infra.demoBank || null,
@@ -2249,6 +2268,9 @@ export async function publicConfig(): Promise<import("@/lib/types").PublicConfig
 export async function enableDevMode(sql: Sql, wallet: string, on: boolean) {
   const me = await getMe(sql, wallet);
   if (!me.isAdmin) throw new Error("Admin only.");
+  const { loadInfra } = await import("@/lib/infra.server");
+  const { isGnosisMainnet } = await import("@/lib/network-config");
+  if (on && isGnosisMainnet((await loadInfra(sql)).chainId)) throw new Error("Dev mode and test DxDAI are disabled on Gnosis mainnet.");
   const { saveInfra, recordContract } = await import("@/lib/infra.server");
 
   if (on) {
@@ -2300,6 +2322,18 @@ export async function savePlatformFile(
 ) {
   const me = await getMe(sql, wallet);
   if (!me.isAdmin && configuredAdmin()) throw new Error("Admin only.");
+  const { loadInfra } = await import("@/lib/infra.server");
+  const current = await loadInfra(sql);
+  if (patch.chainId !== undefined && patch.chainId !== current.chainId) {
+    const { assertNetworkChangeAllowed } = await import("@/lib/network-config");
+    const eventCount = (await sql<{ n: number }>`select count(*)::int as n from events`)[0]?.n ?? 0;
+    assertNetworkChangeAllowed(current.chainId, patch.chainId, eventCount);
+  }
+  if (patch.rpcUrl || patch.chainId) {
+    const { pingChain } = await import("@/lib/chain.server");
+    const ping = await pingChain(patch.rpcUrl ?? current.rpcUrl, patch.chainId ?? current.chainId);
+    if (!ping.connected) throw new Error(ping.lastError || "RPC chain ID does not match the selected network.");
+  }
   const { writePlatform } = await import("@/lib/platform");
   const next = writePlatform(patch);
   invalidatePublicConfig();

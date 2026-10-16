@@ -13,6 +13,7 @@ import { toChainHex } from "@/lib/explorer";
 import { RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS } from "@/lib/receipt";
 import { friendlyChainError } from "@/lib/chain-errors";
 import type { PublicConfig } from "@/lib/types";
+import { assertChainIdMatches } from "@/lib/network-config";
 
 const PREVIEW_KEY = "ct_preview_pk";
 export const SESSION_KEY = "ct_session";
@@ -148,11 +149,13 @@ export async function sendUserCall(
       chain,
       transport: http(net.rpcUrl, { timeout: 40_000 }),
     });
+    assertChainIdMatches(net.chainId, await publicClient.getChainId());
     const provider = currentProvider();
     const mode = typeof window !== "undefined" ? localStorage.getItem(MODE_KEY) : null;
     let hash: Hex;
     if (mode === "injected" && provider) {
       const wallet = createWalletClient({ chain, transport: custom(provider) });
+      assertChainIdMatches(net.chainId, await wallet.getChainId());
       const [account] = await wallet.getAddresses();
       if (!account) throw new Error("Connect a wallet first.");
       hash = await wallet.writeContract({

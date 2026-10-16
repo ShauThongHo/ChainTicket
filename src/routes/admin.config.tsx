@@ -24,6 +24,7 @@ import { explorerAddress } from "@/lib/explorer";
 import { friendlyChainError } from "@/lib/chain-errors";
 import type { InfraStatus } from "@/lib/types";
 import { shortAddr } from "@/lib/utils";
+import { NETWORK_PRESETS, isGnosisMainnet } from "@/lib/network-config";
 
 export const Route = createFileRoute("/admin/config")({ component: AdminConfig });
 
@@ -46,6 +47,16 @@ function AdminConfig() {
   const [kycUrl, setKycUrl] = useState("");
   const [kycAuto, setKycAuto] = useState(false);
   const chain = useChainRun();
+  const mainnet = isGnosisMainnet(Number(chainId));
+
+  function selectNetwork(key: "chiado" | "gnosis") {
+    const preset = NETWORK_PRESETS[key];
+    setChainName(preset.chainName);
+    setNativeSymbol(preset.nativeSymbol);
+    setChainId(String(preset.chainId));
+    setRpcUrl(preset.rpcUrl);
+    setExplorerUrl(preset.explorerUrl);
+  }
 
   async function load() {
     const data = await fetchInfra();
@@ -154,8 +165,8 @@ function AdminConfig() {
             />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={kycAuto} onChange={(e) => setKycAuto(e.target.checked)} />
-            Auto-approve submissions (otherwise they stay pending). Env KYC_AUTO_APPROVE overrides this.
+            <input type="checkbox" checked={kycAuto} disabled={mainnet} onChange={(e) => setKycAuto(e.target.checked)} />
+            Auto-approve submissions (otherwise they stay pending). Disabled on Gnosis mainnet.
           </label>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -289,12 +300,22 @@ function AdminConfig() {
 
       <Card className="mt-4 p-5">
         <h2 className="font-display text-2xl italic">Network & signer</h2>
+        <p className="mt-1 text-sm text-muted">Active network: <strong>{infra?.chain.chainName || chainName}</strong> · chain ID {infra?.chain.chainId ?? chainId}. Each network needs its own deployment and database.</p>
+        {mainnet ? <p className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">Gnosis mainnet is selected. Dev mode, test DxDAI, and KYC auto-approval are disabled.</p> : null}
         <p className="mt-1 text-sm text-muted">
           RPC and admin address are public. The operator private key is written only to the
           database after it is connected.
         </p>
-        {infra?.chain.error ? <p className="mt-2 text-sm text-danger">{infra.chain.error}</p> : null}
+        {infra?.chain.error || infra?.chain.lastError ? <p className="mt-2 text-sm text-danger">{infra?.chain.error || infra?.chain.lastError}</p> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="grid gap-1.5 md:col-span-2">
+            <Label htmlFor="network-preset">Network preset</Label>
+            <select id="network-preset" className="h-10 rounded-md border border-border bg-surface px-3 text-sm text-fg" value={chainId === "100" ? "gnosis" : chainId === "10200" ? "chiado" : "custom"} onChange={(e) => { if (e.target.value === "chiado" || e.target.value === "gnosis") selectNetwork(e.target.value); }}>
+              <option value="chiado">Gnosis Chiado · 10200</option>
+              <option value="gnosis">Gnosis Mainnet · 100</option>
+              <option value="custom">Custom network</option>
+            </select>
+          </div>
           <div className="grid gap-1.5">
             <Label>Chain name</Label>
             <Input value={chainName} onChange={(e) => setChainName(e.target.value)} />
@@ -349,6 +370,7 @@ function AdminConfig() {
             onClick={() =>
               void withBusy(setBusy, async () => {
                 const ping = await testChain({ data: { rpcUrl, chainId: Number(chainId) } });
+                if (!ping.connected) throw new Error(ping.lastError || `RPC chain ID mismatch (configured ${chainId}, received ${ping.chainId}).`);
                 toast.success(`RPC live · block ${ping.blockNumber}`);
                 await load();
               })
@@ -360,6 +382,9 @@ function AdminConfig() {
             disabled={busy}
             onClick={() =>
               void withBusy(setBusy, async () => {
+                const ping = await testChain({ data: { rpcUrl, chainId: Number(chainId) } });
+                if (!ping.connected) throw new Error(ping.lastError || `RPC chain ID mismatch (configured ${chainId}, received ${ping.chainId}).`);
+                setInfra(await saveInfra({ data: { rpcUrl, chainId: Number(chainId), chainName, nativeSymbol, explorerUrl, operatorPk: operatorPk.trim() || undefined } }));
                 await savePlatform({
                   data: {
                     adminWallet,
@@ -370,16 +395,6 @@ function AdminConfig() {
                     explorerUrl,
                   },
                 });
-                setInfra(
-                  await saveInfra({
-                    data: {
-                      rpcUrl,
-                      chainId: Number(chainId),
-                      explorerUrl,
-                      operatorPk: operatorPk.trim() || undefined,
-                    },
-                  }),
-                );
                 setOperatorPk("");
                 toast.success("Saved to database");
               })
@@ -442,7 +457,7 @@ function AdminConfig() {
           </div>
           <Button
             className="mt-4"
-            disabled={busy || !infra?.setup.signer}
+            disabled={busy || !infra?.setup.signer || mainnet}
             onClick={() =>
               void withBusy(setBusy, async () => {
                 const enabling = !infra?.chain.devMode;

@@ -1,7 +1,7 @@
 {
   "adminWallet": "",
-  "chainName": "Testnet",
-  "nativeSymbol": "xDAI",
+  "chainName": "Gnosis Chiado",
+  "nativeSymbol": "XDAI",
   "chainId": 10200,
   "rpcUrl": "https://rpc.chiadochain.net",
   "explorerUrl": "https://gnosis-chiado.blockscout.com"

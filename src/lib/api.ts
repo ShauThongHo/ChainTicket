@@ -368,6 +368,8 @@ export const saveInfra = createServerFn({ method: "POST" })
       databaseUrl: z.string().optional(),
       rpcUrl: z.string().optional(),
       chainId: z.coerce.number().optional(),
+      chainName: z.string().optional(),
+      nativeSymbol: z.string().optional(),
       explorerUrl: z.string().optional(),
       operatorPk: z.string().optional(),
       pinataJwt: z.string().optional(),

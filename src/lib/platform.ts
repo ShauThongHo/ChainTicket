@@ -28,8 +28,8 @@ export const PLATFORM_PATH = resolvePlatformPath();
 
 const FALLBACK: PlatformFile = {
   adminWallet: "",
-  chainName: "Testnet",
-  nativeSymbol: "xDAI",
+  chainName: "Gnosis Chiado",
+  nativeSymbol: "XDAI",
   rpcUrl: "https://rpc.chiadochain.net",
   chainId: 10200,
   explorerUrl: "https://gnosis-chiado.blockscout.com",

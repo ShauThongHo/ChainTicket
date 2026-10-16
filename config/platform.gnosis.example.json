@@ -1,0 +1,8 @@
+{
+  "adminWallet": "",
+  "chainName": "Gnosis",
+  "nativeSymbol": "xDAI",
+  "chainId": 100,
+  "rpcUrl": "https://rpc.gnosischain.com",
+  "explorerUrl": "https://gnosisscan.io"
+}

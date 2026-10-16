@@ -1,5 +1,6 @@
 import { loadInfra } from "@/lib/infra.server";
 import { getSql } from "@/lib/db";
+import { verifyTicketMetadata } from "@/lib/ticket-metadata";
 
 async function jwt() {
   const sql = await getSql();
@@ -18,10 +19,12 @@ export async function pinFile(opts: { filename: string; contentType: string; byt
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  const json = (await res.json()) as { IpfsHash?: string; error?: { reason?: string } };
+  const json = (await res.json().catch(() => ({}))) as { IpfsHash?: string; error?: { reason?: string } };
   if (!res.ok || !json.IpfsHash) {
-    throw new Error(json.error?.reason || "Pinata upload failed.");
+    if (res.status === 401 || res.status === 403) throw new Error("Pinata rejected the JWT. Check that it is valid and has permission to pin files.");
+    throw new Error(json.error?.reason || `Pinata image upload failed (HTTP ${res.status}).`);
   }
+  if (!/^[a-zA-Z0-9]{20,120}$/.test(json.IpfsHash)) throw new Error("Pinata returned an invalid image CID.");
   return {
     cid: json.IpfsHash,
     uri: `ipfs://${json.IpfsHash}`,
@@ -42,10 +45,12 @@ export async function pinJson(content: Record<string, unknown>, name: string) {
       pinataMetadata: { name: name.slice(0, 80) || "chainticket.json" },
     }),
   });
-  const json = (await res.json()) as { IpfsHash?: string; error?: { reason?: string } };
+  const json = (await res.json().catch(() => ({}))) as { IpfsHash?: string; error?: { reason?: string } };
   if (!res.ok || !json.IpfsHash) {
-    throw new Error(json.error?.reason || "Pinata JSON pin failed.");
+    if (res.status === 401 || res.status === 403) throw new Error("Pinata rejected the JWT. Check that it is valid and has permission to pin JSON.");
+    throw new Error(json.error?.reason || `Pinata metadata upload failed (HTTP ${res.status}).`);
   }
+  if (!/^[a-zA-Z0-9]{20,120}$/.test(json.IpfsHash)) throw new Error("Pinata returned an invalid metadata CID.");
   return {
     cid: json.IpfsHash,
     uri: `ipfs://${json.IpfsHash}`,
@@ -99,7 +104,7 @@ export async function pinTicketMetadata(opts: {
     const file = await pinFile({ filename: "ticket.svg", contentType: "image/svg+xml", bytes: svg });
     image = file.url;
   }
-  return pinJson(
+  const pinned = await pinJson(
     {
       name: `${opts.eventName} — ${opts.tierName}`,
       description:
@@ -115,4 +120,6 @@ export async function pinTicketMetadata(opts: {
     },
     `${opts.eventName}-${opts.tierName}.json`,
   );
+  await verifyTicketMetadata(pinned.url);
+  return pinned;
 }
