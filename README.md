@@ -1,118 +1,128 @@
 # ChainTicket
 
-ChainTicket is a blockchain ticketing application for the Gnosis Chiado test network. Attendees can discover events, purchase ERC-721 tickets, and present them at the door. Organizers can create events, check in ticket holders, and request payouts.
-
-> This project is intended for test-network use. Review all on-chain, KYC, and payout settings carefully before deployment.
+A blockchain ticketing application for discovering events, issuing and trading ERC-721 tickets, and managing event entry and payouts on the Gnosis Chiado test network.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Network](https://img.shields.io/badge/network-Gnosis%20Chiado-blue)
+![Network: Gnosis Chiado](https://img.shields.io/badge/network-Gnosis%20Chiado-blue)
 
-## ✨ Features
+> **Test-network software.** ChainTicket handles on-chain transactions and sensitive KYC information. Review its security and deployment settings before using it with real users.
 
-- Browse events, view event details, and purchase tickets
-- Hold event tickets as ERC-721 tokens
-- Resell tickets and verify entry with ticket QR codes
-- Submit KYC information for administrator review
-- Create events, check in attendees, and manage refunds as an organizer
-- Request and review payouts according to event rules
-- Manage organizers, KYC, platform configuration, and event status as an administrator
-- Perform on-chain operations on the Gnosis Chiado test network
+## Features
 
-## 🧰 Tech stack
+- Browse events, inspect ticket tiers, and purchase tickets with a connected wallet.
+- Issue, hold, and resell ERC-721 tickets.
+- Submit KYC information for administrator review.
+- Let organizers create events, scan ticket QR codes, manage refunds, and request payouts.
+- Let administrators review organizers and KYC, configure the platform, freeze events, and review escalated payouts.
+- Apply payout rules based on the deployed event contract version.
+
+## Technology
 
 - React 19, TypeScript, TanStack Start and TanStack Router
-- Tailwind CSS and Vite
-- Solidity, viem, and OpenZeppelin Contracts
-- PostgreSQL (Neon) and PGlite
+- Vite and Tailwind CSS
+- Solidity, viem and OpenZeppelin Contracts
+- PostgreSQL (including Neon deployments) and PGlite for local development
+- Pinata for ticket metadata storage
 
-## 👥 Intended users
+## Project structure
 
-- Developers exploring blockchain ticketing workflows
-- Event attendees and organizers using the Gnosis Chiado test network
-- Platform administrators managing KYC, events, and payouts
+```text
+.
+├── config/
+│   └── platform.example.json  # Public platform bootstrap template
+├── contracts/                 # Solidity contracts and compiled artifacts
+├── migrations/                # Database schema migrations
+├── public/                    # Static assets, event artwork and icons
+├── scripts/                   # Development, migration, contract and QA scripts
+├── server/                    # Server middleware and deployment integration
+├── src/
+│   ├── components/            # Shared application and UI components
+│   ├── lib/                   # API, database, wallet, chain, KYC and domain logic
+│   └── routes/                # Marketplace, event, ticket, organizer and admin pages
+├── package.json               # Dependencies and npm commands
+├── package-lock.json          # Reproducible npm dependency lockfile
+├── startup.sh                 # Workspace preview startup script
+├── tsconfig.json              # TypeScript configuration
+└── vite.config.ts             # Vite, TanStack Start and deployment configuration
+```
 
-## 🚀 Getting started
+## Requirements
 
-### Prerequisites
-
-- Node.js 22
+- Node.js 22 or later
 - npm
-- A wallet configured for the Gnosis Chiado network
+- A browser wallet configured for Gnosis Chiado
+- A Gnosis Chiado RPC endpoint for network access
 
-### Install and run
+Database, operator signer, Pinata and KYC encryption configuration are required for the corresponding server-backed workflows.
 
-`ash
+## Initialize and run
+
+Clone the repository, create the local platform configuration from the tracked example, and set the administrator wallet address before starting the app:
+
+```bash
 git clone https://github.com/ShauThongHo/ChainTicket.git
 cd ChainTicket
-npm install
+cp config/platform.example.json config/platform.json
+```
+
+Edit `config/platform.json` and set `adminWallet` to the platform administrator's public Chiado wallet address. The example already provides Chiado's chain ID, RPC URL and explorer URL; adjust them if you use a different network endpoint. The file is intentionally ignored by Git because it is machine-specific.
+
+Then install dependencies and start the development server:
+
+```bash
+npm ci
 npm run dev
-`
+```
 
-Open the local address printed by the development server and connect a wallet configured for Gnosis Chiado.
+Open the local URL printed by the development server and connect a wallet configured for Gnosis Chiado. Do not put private keys or service credentials in `config/platform.json`.
 
-## ⚙️ Configuration
+## Configuration
 
-On first run, open the administrator **Configuration** page to configure the database, Pinata, and operator signer. The bootstrap configuration includes the public administrator wallet address and RPC details. Sensitive credentials must be provided through protected administrator settings or the deployment environment.
+`config/platform.example.json` documents the bootstrap configuration shape:
 
-| Setting | Purpose | Notes |
+| Field | Purpose | Example / handling |
 | --- | --- | --- |
-| Database connection | Stores application data and configuration | Can be provided as DATABASE_URL in deployment environments |
-| Chiado RPC URL | Connects to Gnosis Chiado | Use a reliable Chiado RPC provider |
-| Operator signer key | Signs platform on-chain operations | Server-side secret; never commit it to the repository |
-| Pinata JWT | Pins ticket metadata | Keep it private and server-side |
-| KYC encryption key | Protects sensitive KYC data | Manage as a server-side secret |
-| Administrator wallet address | Identifies the platform administrator | The address is public; do not confuse it with a private key |
+| `adminWallet` | Public wallet address used to identify the platform administrator | Set this before first run; use an address, never a private key |
+| `chainName` | Display name for the network | `Testnet` in the example |
+| `nativeSymbol` | Network's native currency symbol | `xDAI` in the example |
+| `chainId` | Chain identifier | `10200` for Gnosis Chiado |
+| `rpcUrl` | JSON-RPC endpoint | `https://rpc.chiadochain.net` in the example |
+| `explorerUrl` | Block explorer base URL | `https://gnosis-chiado.blockscout.com` in the example |
 
-> Never commit private keys, Pinata JWTs, KYC encryption keys, or database credentials to Git, and never post them in public issues. Disable Dev mode and KYC auto-approval in production.
+Database, operator signer, Pinata JWT and KYC encryption settings are separate server-side configuration. Configure them through the protected Admin Configuration flow or the deployment environment as appropriate. `DATABASE_URL` may be provided by the deployment environment. Never commit private keys, access tokens, database credentials, KYC keys, local KYC data, or secret files. Dev mode and KYC auto-approval are for development only; keep auto-approval disabled in production.
 
-## 📖 Basic usage
+## Usage
 
 1. Start the app and connect a Gnosis Chiado wallet.
-2. Browse events in the marketplace and review ticket and event details.
-3. Complete KYC if required by an event, then purchase a ticket.
+2. Browse the marketplace and open an event to review its details and ticket tiers.
+3. Complete KYC if the event requires it, then purchase a ticket.
 4. View owned tickets under **My Tickets** and follow the on-screen instructions to present entry credentials.
-5. After approval by an administrator, organizers can create events, check in attendees, and request payouts under the applicable rules.
+5. Once approved, organizers can create events, scan tickets, and request payouts from the organizer area.
+6. Administrators can configure services and review KYC, organizers and payout requests in the admin area.
 
-Administrators can configure platform services and review KYC, organizer, and payout requests in the admin area.
+Compile the Solidity contracts and refresh the checked-in ABI and bytecode artifacts with:
 
-## 🧾 Smart contracts
-
-Solidity sources are located in contracts/. To compile the contracts and refresh the checked-in ABI and bytecode artifacts, run:
-
-`ash
+```bash
 node scripts/compile-contracts.mjs
-`
+```
 
-New events use engine version 4. Existing events retain their deployed contract version and payout behavior. Deployed contracts are immutable.
+## Development
 
-## 💸 Payout rules
+```bash
+npm run dev          # Start the development server
+npm run build        # Build the app and apply database migrations
+npm run typecheck    # Run TypeScript checks
+npm test             # Run automated tests
+npm run lint         # Run ESLint
+npm run db:migrate   # Apply database migrations
+```
 
-- Legacy events retain the original ticket-holder support vote.
-- Version 4 events can request a payout only after the event ends. A seven-day opposition period follows, with voting weight based on tickets sold.
-- If opposition reaches one third of the sold-ticket weight, the organizer can submit payout materials for administrator review after the period closes. Otherwise, the organizer can execute the payout after the full seven days.
-- The app and server block cancellations and refunds after an event ends. Previously deployed contracts cannot be upgraded with this restriction.
+New events use engine version 4. Existing events retain their deployed contract version and payout behavior; deployed contracts are immutable. Version 4 payout requests open a seven-day opposition period after the event ends.
 
-## 🛠️ Troubleshooting
+## Contributing
 
-**Event creation fails**  
-Check that the operator signer and Pinata JWT are configured in Admin Configuration. Metadata is pinned before tickets are minted.
+Issues and pull requests are welcome. Please explain the motivation and scope of changes, keep secrets and personal data out of commits, and include relevant test or verification results.
 
-**An on-chain transaction fails**  
-Check the Chiado RPC, the operator account's native-token balance, and the wallet's selected network.
+## License
 
-**A ticket image does not appear in a wallet**  
-Third-party indexers may take time to refresh. Open the ticket metadata URL from the app to inspect the JSON and image URL directly.
-
-**KYC stays pending**  
-Confirm that the wallet completed the submission and that an administrator reviewed it. Auto-approval is available only in Dev mode.
-
-**Payout is unavailable**  
-The event must have ended. Version 4 events also require the seven-day opposition period to close.
-
-## 🤝 Contributing
-
-Issues and pull requests are welcome. Please describe the purpose and scope of your change and include relevant test or verification results.
-
-## 📄 License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+ChainTicket is intended to be distributed under the MIT License. See [LICENSE](LICENSE) for the license text.

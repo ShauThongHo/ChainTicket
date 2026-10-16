@@ -1,9 +1,49 @@
+# Dependencies
 node_modules/
-.project_id
-.github_repo
+
+# Build and framework output
+dist/
+build/
+.output/
+.vercel/
+.tanstack/
+.cache/
+coverage/
+
+# Local data and secrets
+.data/
 .env
 .env.*
-.data/
+!.env.example
 *.pem
-infra.json
 operator-secrets.json
+config/platform.json
+config/*secrets*
+config/*private*
+config/*credentials*
+infra.json
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+.node_modules.lock
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# App Builder workspace metadata
+.project_id
+.github_repo
