@@ -46,11 +46,13 @@ A blockchain ticketing application for discovering events, issuing and trading E
 └── vite.config.ts             # Vite, TanStack Start and deployment configuration
 ```
 
+> **Mainnet deployment note:** this codebase is currently configured for Gnosis Chiado testnet (chain ID 10200). Editing config/platform.json alone does not enable a safe Gnosis mainnet deployment. Mainnet use requires a code and contract review, removal of test-only features, mainnet wallet/network support, and a security review.
+
 ## Requirements
 
 - Node.js 22 or later
 - npm
-- A browser wallet configured for Gnosis Chiado
+- A browser wallet configured for Gnosis Chiado testnet
 - A Gnosis Chiado RPC endpoint for network access
 
 Database, operator signer, Pinata and KYC encryption configuration are required for the corresponding server-backed workflows.
@@ -74,7 +76,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by the development server and connect a wallet configured for Gnosis Chiado. Do not put private keys or service credentials in `config/platform.json`.
+Open the local URL printed by the development server and connect a wallet configured for Gnosis Chiado testnet. Do not put private keys or service credentials in `config/platform.json`.
 
 ## Configuration
 

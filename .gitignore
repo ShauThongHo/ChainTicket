@@ -5,9 +5,12 @@ node_modules/
 dist/
 build/
 .output/
+.vite/
 .vercel/
 .tanstack/
 .cache/
+playwright-report/
+test-results/
 coverage/
 
 # Local data and secrets
