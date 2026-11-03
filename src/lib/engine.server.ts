@@ -1237,7 +1237,7 @@ export async function mintEvent(
     const t = input.tiers[i]!;
     const meta = metas[i]!;
     const tierOnChain = chainId + 1;
-    const tokenUri = meta.url || meta.uri;
+    const tokenUri = meta.uri || meta.url;
     const stageOffset = bank ? 7 : 6;
     await markStep(stageOffset + i * 2);
     await setTierUriOnChain({
@@ -2123,6 +2123,7 @@ export async function getInfraStatus(sql: Sql, wallet: string): Promise<InfraSta
     operatorKeySet: Boolean(cfg.operatorPk),
     operatorMask: secretMask(cfg.operatorPk),
     explorerUrl: cfg.explorerUrl,
+    ipfsGateway: cfg.ipfsGateway,
     lastError: null,
     lastAnchor: null,
     error: null,
@@ -2196,6 +2197,7 @@ export async function applyInfra(
     explorerUrl?: string;
     operatorPk?: string;
     pinataJwt?: string;
+    ipfsGateway?: string;
     clearOperatorPk?: boolean;
     clearDatabaseUrl?: boolean;
     clearPinata?: boolean;
@@ -2255,6 +2257,7 @@ export async function publicConfig(): Promise<import("@/lib/types").PublicConfig
     chainId: infra.chainId,
     rpcUrl: infra.rpcUrl,
     explorerUrl: infra.explorerUrl,
+    ipfsGateway: infra.ipfsGateway,
     adminConfigured: Boolean(plat.adminWallet),
     devMode: Boolean(infra.devMode),
     demoBank: infra.demoBank || null,
@@ -2268,9 +2271,6 @@ export async function publicConfig(): Promise<import("@/lib/types").PublicConfig
 export async function enableDevMode(sql: Sql, wallet: string, on: boolean) {
   const me = await getMe(sql, wallet);
   if (!me.isAdmin) throw new Error("Admin only.");
-  const { loadInfra } = await import("@/lib/infra.server");
-  const { isGnosisMainnet } = await import("@/lib/network-config");
-  if (on && isGnosisMainnet((await loadInfra(sql)).chainId)) throw new Error("Dev mode and test DxDAI are disabled on Gnosis mainnet.");
   const { saveInfra, recordContract } = await import("@/lib/infra.server");
 
   if (on) {
@@ -2288,6 +2288,36 @@ export async function enableDevMode(sql: Sql, wallet: string, on: boolean) {
   invalidatePublicConfig();
 
   return getInfraStatus(await (await import("@/lib/db")).getSql(), wallet);
+}
+
+export async function resetApplicationData(sql: Sql, wallet: string, confirmation: string) {
+  const me = await getMe(sql, wallet);
+  if (!me.isAdmin) throw new Error("Admin only.");
+  if (confirmation !== "RESET APPLICATION DATA") {
+    throw new Error('Type "RESET APPLICATION DATA" exactly to confirm the reset.');
+  }
+
+  const { clearExternalKycRecords } = await import("@/lib/kyc-store.server");
+  const removedExternalKycRecords = await clearExternalKycRecords(sql);
+  await sql.query(`
+    TRUNCATE TABLE
+      withdraw_votes, withdraw_requests, pending_index, mint_jobs,
+      deployed_contracts, listings, tickets, ticket_tiers, event_vaults,
+      ledger, events, accounts, organizers, kyc_public, kyc_audit,
+      kyc_private, kyc, login_nonces
+    RESTART IDENTITY CASCADE
+  `);
+
+  let removedKycPhotos = 0;
+  let photoCleanupWarning: string | null = null;
+  try {
+    const { clearKycPhotos } = await import("@/lib/kyc-photo.server");
+    removedKycPhotos = clearKycPhotos();
+  } catch {
+    photoCleanupWarning = "Database data was reset, but local KYC photo files could not be removed. Check the server's KYC photo storage manually.";
+  }
+  balCache.clear();
+  return { ok: true as const, removedExternalKycRecords, removedKycPhotos, photoCleanupWarning };
 }
 
 export async function setPlatformAdmin(sql: Sql, actor: string, address: string) {

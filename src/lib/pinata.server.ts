@@ -65,20 +65,6 @@ export function toIpfsUri(url: string) {
   return url;
 }
 
-/** HTTPS gateway form. Explorers preview this; the CID is still in the path. */
-export function toHttpsGateway(raw: string) {
-  const url = raw.trim();
-  if (!url) return "";
-  if (url.startsWith("ipfs://")) {
-    const cid = url.slice("ipfs://".length).replace(/^ipfs\//, "");
-    return cid ? `https://gateway.pinata.cloud/ipfs/${cid}` : "";
-  }
-  const m = url.match(/\/ipfs\/([^/?#]+)/i);
-  if (m?.[1]) return `https://gateway.pinata.cloud/ipfs/${m[1]}`;
-  if (url.startsWith("https://") || url.startsWith("http://")) return url;
-  return "";
-}
-
 export async function pinTicketMetadata(opts: {
   eventName: string;
   description: string;
@@ -87,10 +73,9 @@ export async function pinTicketMetadata(opts: {
   faceCents: number;
   imageUrl: string;
 }) {
-  // Testnet explorers often skip ipfs:// art. `image` is an https URL a normal
-  // browser can open. tokenURI itself is the gateway URL of this JSON (CID in the path).
-  // Indexers on Chiado can still lag — a readable tokenURI is the check.
-  let image = toHttpsGateway(opts.imageUrl);
+  // Store canonical content-addressed URIs in JSON and on-chain. Gateways are
+  // transport only and can rate-limit or reject automated clients.
+  let image = toIpfsUri(opts.imageUrl);
   if (!image) {
     const label = opts.eventName.replace(/[<>&]/g, "") || "ChainTicket";
     const svg = Buffer.from(
@@ -102,7 +87,7 @@ export async function pinTicketMetadata(opts: {
       "utf8",
     );
     const file = await pinFile({ filename: "ticket.svg", contentType: "image/svg+xml", bytes: svg });
-    image = file.url;
+    image = file.uri;
   }
   const pinned = await pinJson(
     {
@@ -120,6 +105,8 @@ export async function pinTicketMetadata(opts: {
     },
     `${opts.eventName}-${opts.tierName}.json`,
   );
-  await verifyTicketMetadata(pinned.url);
+  const sql = await getSql();
+  const infra = await loadInfra(sql);
+  await verifyTicketMetadata(pinned.uri, fetch, { preferredGateway: infra.ipfsGateway });
   return pinned;
 }

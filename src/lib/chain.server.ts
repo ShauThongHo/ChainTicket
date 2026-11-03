@@ -14,7 +14,7 @@ import { readPlatform } from "@/lib/platform";
 import { getSql } from "@/lib/db";
 import { loadInfra } from "@/lib/infra.server";
 import { RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS } from "@/lib/receipt";
-import { assertChainIdMatches, CHIADO_CHAIN_ID } from "@/lib/network-config";
+import { assertChainIdMatches } from "@/lib/network-config";
 
 const globalRef = globalThis as typeof globalThis & {
   __ctLastChainError__?: string | null;
@@ -145,7 +145,6 @@ export function centsToWei(cents: number) {
 
 export async function deployDemoBank(admin: `0x${string}`) {
   const { account, wallet, publicClient } = await clients();
-  if (publicClient.chain?.id !== CHIADO_CHAIN_ID) throw new Error("Test DxDAI deployment is available on Chiado only; it is disabled on Gnosis mainnet.");
   const hash = await wallet.deployContract({
     abi: artifacts.DemoBank.abi,
     bytecode: artifacts.DemoBank.bytecode as Hex,

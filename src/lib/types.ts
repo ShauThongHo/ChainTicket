@@ -30,6 +30,7 @@ export type PublicConfig = {
   chainId: number;
   rpcUrl: string;
   explorerUrl: string;
+  ipfsGateway: string;
   adminConfigured: boolean;
   devMode: boolean;
   demoBank: string | null;
@@ -209,6 +210,7 @@ export type InfraStatus = {
     operatorKeySet: boolean;
     operatorMask: string | null;
     explorerUrl: string;
+    ipfsGateway: string;
     lastError: string | null;
     lastAnchor: { hash: string; at: string; kind: string } | null;
     error: string | null;

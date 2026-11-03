@@ -4,7 +4,6 @@ import { describeDatabaseUrl } from "@/lib/db";
 import { decodeAesKey, idHash, idLast4, newKycRef, normalizeId, openSeal, seal } from "@/lib/kyc-crypto";
 import { readKycPhoto, storeKycPhoto } from "@/lib/kyc-photo.server";
 import type { KycDetail, KycListRow, KycStatus } from "@/lib/types";
-import { isGnosisMainnet } from "@/lib/network-config";
 
 /**
  * Identity store.
@@ -198,17 +197,21 @@ async function keyMaterial(sql: Sql): Promise<KeyMaterial> {
 }
 
 export async function kycAutoApprove(sql: Sql) {
-  const { loadInfra } = await import("@/lib/infra.server");
-  if (isGnosisMainnet((await loadInfra(sql)).chainId)) return false;
   const flags = await sql<{ key: string; value: string }>`
-    select key, value from infra_settings where key in ('dev_mode', 'kyc_auto_approve')
+    select key, value from infra_settings where key = 'kyc_auto_approve'
   `;
   const settings = new Map(flags.map((r) => [r.key, r.value]));
-  if (settings.get("dev_mode") !== "true") return false;
   const env = process.env.KYC_AUTO_APPROVE?.trim().toLowerCase();
   if (env === "true" || env === "1") return true;
   if (env === "false" || env === "0") return false;
   return settings.get("kyc_auto_approve") === "true";
+}
+
+export async function clearExternalKycRecords(sql: Sql) {
+  const { sql: privateSql, source } = await getKycSql(sql);
+  if (source === "shared") return 0;
+  const removed = await privateSql.query<{ kyc_ref: string }>("delete from kyc_private returning kyc_ref");
+  return removed.length;
 }
 
 export async function kycInfraSummary(sql: Sql) {

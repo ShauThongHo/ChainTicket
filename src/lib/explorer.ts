@@ -18,8 +18,11 @@ export function toChainHex(id: number) {
   return `0x${id.toString(16)}`;
 }
 
-export function gatewayUrl(uri: string) {
+export function gatewayUrl(uri: string, preferredGateway?: string) {
   if (!uri) return "";
-  if (uri.startsWith("ipfs://")) return `https://gateway.pinata.cloud/ipfs/${uri.slice(7)}`;
+  const base = (preferredGateway || "https://dweb.link").replace(/\/+$/, "").replace(/\/ipfs$/i, "");
+  if (uri.startsWith("ipfs://")) return `${base}/ipfs/${uri.slice(7).replace(/^ipfs\//, "")}`;
+  const ipfsPath = uri.match(/^https?:\/\/[^/]+\/ipfs\/([^?#]+)/i);
+  if (ipfsPath?.[1]) return `${base}/ipfs/${ipfsPath[1]}`;
   return uri;
 }

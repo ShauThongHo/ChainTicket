@@ -98,17 +98,17 @@ function TicketCard({ ticket, onChange }: { ticket: MyTicket; onChange: () => vo
   useEffect(() => {
     if (!ticket.tokenUri) return;
     let stop = false;
-    fetch(gatewayUrl(ticket.tokenUri))
+    fetch(gatewayUrl(ticket.tokenUri, config?.ipfsGateway))
       .then((r) => r.json())
       .then((json: { image?: string }) => {
         if (stop || typeof json.image !== "string" || !json.image) return;
-        setArt(gatewayUrl(json.image));
+        setArt(gatewayUrl(json.image, config?.ipfsGateway));
       })
       .catch(() => undefined);
     return () => {
       stop = true;
     };
-  }, [ticket.tokenUri]);
+  }, [ticket.tokenUri, config?.ipfsGateway]);
 
   useEffect(() => {
     let stop = false;
@@ -267,7 +267,7 @@ function TicketCard({ ticket, onChange }: { ticket: MyTicket; onChange: () => vo
           {ticket.tokenUri ? (
             <>
               {" · "}
-              <a className="text-primary underline" href={gatewayUrl(ticket.tokenUri)} target="_blank" rel="noreferrer">
+              <a className="text-primary underline" href={gatewayUrl(ticket.tokenUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">
                 Open ticket details
               </a>
             </>

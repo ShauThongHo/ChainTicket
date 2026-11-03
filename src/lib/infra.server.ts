@@ -11,10 +11,23 @@ import {
 } from "@/lib/db";
 import { readPlatform } from "@/lib/platform";
 import { normalizeWallet } from "@/lib/session.server";
-import { assertNetworkChangeAllowed, isGnosisMainnet } from "@/lib/network-config";
+import { assertNetworkChangeAllowed } from "@/lib/network-config";
 
 const DB_POINTER = "/workspace/.data/db-pointer.json";
 const LEGACY_INFRA_PATH = "/workspace/.data/infra.json";
+export const DEFAULT_IPFS_GATEWAY = "https://dweb.link";
+
+export function normalizeIpfsGateway(raw: string | undefined) {
+  const value = (raw || DEFAULT_IPFS_GATEWAY).trim();
+  let url: URL;
+  try { url = new URL(value); }
+  catch { throw new Error("IPFS gateway must be a valid HTTPS URL."); }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("IPFS gateway must be HTTPS and cannot include credentials, query parameters, or a fragment.");
+  }
+  const path = url.pathname.replace(/\/+$/, "").replace(/\/ipfs$/i, "");
+  return `${url.origin}${path}`;
+}
 
 export type InfraFile = {
   databaseUrl?: string;
@@ -25,6 +38,7 @@ export type InfraFile = {
   explorerUrl?: string;
   operatorPk?: string;
   pinataJwt?: string;
+  ipfsGateway?: string;
   demoBank?: string;
   devMode?: boolean;
   databaseUrlKyc?: string;
@@ -64,9 +78,8 @@ export async function loadInfra(sql: Sql) {
   }
   const get = (key: string, fallback = "") => (map && map.has(key) ? (map.get(key) ?? "") : fallback);
   const chainId = Number(get("chain_id") || file.chainId || plat.chainId) || plat.chainId;
-  const mainnet = isGnosisMainnet(chainId);
-  const devMode = !mainnet && (map?.has("dev_mode") ? map.get("dev_mode") === "true" : file.devMode === true);
-  const demoBank = mainnet ? "" : (map?.has("demo_bank") ? (map.get("demo_bank") ?? "").trim() : (file.demoBank || "").trim());
+  const devMode = map?.has("dev_mode") ? map.get("dev_mode") === "true" : file.devMode === true;
+  const demoBank = (map?.has("demo_bank") ? (map.get("demo_bank") ?? "").trim() : (file.demoBank || "").trim());
   return {
     databaseUrl: (get("database_url") || file.databaseUrl || "").trim(),
     rpcUrl: (get("rpc_url") || file.rpcUrl || plat.rpcUrl).trim(),
@@ -76,10 +89,11 @@ export async function loadInfra(sql: Sql) {
     explorerUrl: (get("explorer_url") || file.explorerUrl || plat.explorerUrl).trim(),
     operatorPk: (get("operator_pk") || file.operatorPk || "").trim(),
     pinataJwt: (get("pinata_jwt") || file.pinataJwt || "").trim(),
+    ipfsGateway: normalizeIpfsGateway(get("ipfs_gateway", file.ipfsGateway || DEFAULT_IPFS_GATEWAY)),
     demoBank,
     devMode,
     databaseUrlKyc: (get("database_url_kyc") || "").trim(),
-    kycAutoApprove: !mainnet && devMode && get("kyc_auto_approve") === "true",
+    kycAutoApprove: get("kyc_auto_approve") === "true",
   };
 }
 
@@ -94,6 +108,8 @@ export async function saveInfra(
 ) {
   const current = await loadInfra(sql);
   const plat = readPlatform();
+  const nextChainId = patch.chainId ?? current.chainId;
+  const networkChanged = nextChainId !== current.chainId;
   const next: InfraFile = {
     databaseUrl: patch.clearDatabaseUrl
       ? ""
@@ -115,27 +131,27 @@ export async function saveInfra(
       : patch.pinataJwt !== undefined
         ? patch.pinataJwt.trim()
         : current.pinataJwt,
-    demoBank: isGnosisMainnet(patch.chainId ?? current.chainId)
+    ipfsGateway: patch.ipfsGateway !== undefined
+      ? normalizeIpfsGateway(patch.ipfsGateway)
+      : current.ipfsGateway || DEFAULT_IPFS_GATEWAY,
+    demoBank: networkChanged
       ? ""
       : patch.demoBank !== undefined
         ? patch.demoBank.trim()
         : current.demoBank,
-    devMode: isGnosisMainnet(patch.chainId ?? current.chainId) ? false : (patch.devMode ?? current.devMode),
+    devMode: networkChanged ? false : (patch.devMode ?? current.devMode),
     databaseUrlKyc: patch.clearDatabaseUrlKyc
       ? ""
       : patch.databaseUrlKyc !== undefined
         ? patch.databaseUrlKyc.trim()
         : current.databaseUrlKyc,
-    kycAutoApprove: !isGnosisMainnet(patch.chainId ?? current.chainId) && (patch.devMode ?? current.devMode) && (patch.kycAutoApprove ?? current.kycAutoApprove),
+    kycAutoApprove: networkChanged ? false : (patch.kycAutoApprove ?? current.kycAutoApprove),
   };
 
   if (!Number.isSafeInteger(next.chainId) || (next.chainId ?? 0) <= 0) {
     throw new Error("Chain ID must be a positive integer.");
   }
 
-  if (isGnosisMainnet(next.chainId ?? 0) && patch.devMode === true) {
-    throw new Error("Dev mode and test DxDAI are disabled on Gnosis mainnet.");
-  }
   const eventCount = (await sql<{ n: number }>`select count(*)::int as n from events`)[0]?.n ?? 0;
   assertNetworkChangeAllowed(current.chainId, next.chainId ?? current.chainId, eventCount);
 
@@ -163,6 +179,7 @@ export async function saveInfra(
     ["operator_pk", next.operatorPk ?? ""],
     ["database_url", next.databaseUrl ?? ""],
     ["pinata_jwt", next.pinataJwt ?? ""],
+    ["ipfs_gateway", next.ipfsGateway ?? DEFAULT_IPFS_GATEWAY],
     ["demo_bank", next.demoBank ?? ""],
     ["dev_mode", next.devMode ? "true" : "false"],
     ["database_url_kyc", next.databaseUrlKyc ?? ""],

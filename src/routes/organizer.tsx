@@ -141,6 +141,7 @@ function OrganizerEventCard({
   onDone: () => void;
   runChain: (title: string, labels: string[], task: (tick: (n: number) => void) => Promise<void>) => Promise<void>;
 }) {
+  const { config } = useSession();
   const [materials, setMaterials] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
@@ -245,7 +246,7 @@ function OrganizerEventCard({
           ) : null}
           {ev.materialsUri ? (
             <p className="mt-1 font-mono text-xs">
-              <a className="text-primary underline" href={gatewayUrl(ev.materialsUri)} target="_blank" rel="noreferrer">
+              <a className="text-primary underline" href={gatewayUrl(ev.materialsUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">
                 payout materials
               </a>
             </p>

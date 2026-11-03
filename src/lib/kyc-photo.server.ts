@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const MAX_BYTES = 4_000_000;
@@ -82,4 +82,20 @@ export function readKycPhoto(key: string) {
     bytes,
     contentType: key.endsWith(".png") ? ("image/png" as const) : ("image/jpeg" as const),
   };
+}
+
+export function clearKycPhotos() {
+  let files: string[];
+  try { files = readdirSync(dir()); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
+  let removed = 0;
+  for (const file of files) {
+    if (!/^[a-f0-9]{32}\.(jpg|png)$/.test(file)) continue;
+    unlinkSync(join(dir(), file));
+    removed += 1;
+  }
+  return removed;
 }

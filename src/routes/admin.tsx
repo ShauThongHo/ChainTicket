@@ -286,7 +286,7 @@ function AdminDashboard() {
               {p.materialsUri ? (
                 <a
                   className="font-mono text-xs text-primary underline"
-                  href={gatewayUrl(p.materialsUri)}
+                  href={gatewayUrl(p.materialsUri, config?.ipfsGateway)}
                   target="_blank"
                   rel="noreferrer"
                 >

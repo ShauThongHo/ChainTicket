@@ -157,7 +157,7 @@ function MintPage() {
           <a className="text-primary underline" href={explorerAddress(mintReceipt.collection, config?.explorerUrl ?? "")} target="_blank" rel="noreferrer">
             Collection {shortAddr(mintReceipt.collection)}
           </a>
-          {mintReceipt.metadata[0] ? <a className="text-primary underline" href={gatewayUrl(mintReceipt.metadata[0].tokenUri)} target="_blank" rel="noreferrer">
+          {mintReceipt.metadata[0] ? <a className="text-primary underline" href={gatewayUrl(mintReceipt.metadata[0].tokenUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">
             Open ticket details · token #{mintReceipt.metadata[0].tokenId}
           </a> : null}
           <span>Explorer images can take time to appear. Open the details to check the JSON and image.</span>

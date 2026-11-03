@@ -92,7 +92,7 @@ Open the local URL printed by the development server and connect a wallet config
 | `rpcUrl` | JSON-RPC endpoint | Chiado or Gnosis RPC URL from the example |
 | `explorerUrl` | Block explorer base URL | Chiado Blockscout or `https://gnosisscan.io` |
 
-Database, operator signer, Pinata JWT and KYC encryption settings are separate server-side configuration. Configure them through the protected Admin Configuration flow or the deployment environment as appropriate. `DATABASE_URL` may be provided by the deployment environment. Never commit private keys, access tokens, database credentials, KYC keys, local KYC data, or secret files. On Gnosis mainnet, Dev mode, test DxDAI and KYC auto-approval are disabled. Pinata metadata and images are verified through the public gateway before contracts are deployed; the tier URI and first minted token's `tokenURI` are also read back before mint success is reported.
+Database, operator signer, Pinata JWT, IPFS read gateway and KYC settings are separate server-side configuration. Configure them through the protected Admin Configuration flow or the deployment environment as appropriate. `DATABASE_URL` may be provided by the deployment environment. Never commit private keys, access tokens, database credentials, KYC keys, local KYC data, or secret files. New ticket metadata stores canonical `ipfs://` URIs on-chain and in IPFS image fields; before minting, the app verifies the metadata JSON and image through multiple public gateways, then reads the tier URI and first minted token's `tokenURI` back from the chain. Dev mode and automatic KYC approval can be enabled on Gnosis mainnet; Dev mode deploys a real DxDAI contract on mainnet and automatic KYC approval skips administrator review.
 
 ## Usage
 

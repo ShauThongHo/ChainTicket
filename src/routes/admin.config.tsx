@@ -16,6 +16,7 @@ import {
   saveInfra,
   savePlatform,
   saveRoyalty,
+  resetApplicationData,
   setDevMode,
   testChain,
   testDatabase,
@@ -42,6 +43,8 @@ function AdminConfig() {
   const [adminWallet, setAdminWallet] = useState("");
   const [operatorPk, setOperatorPk] = useState("");
   const [pinataJwt, setPinataJwt] = useState("");
+  const [ipfsGateway, setIpfsGateway] = useState("https://dweb.link");
+  const [resetPhrase, setResetPhrase] = useState("");
   const [bps, setBps] = useState("10");
   const [rotatedAddr, setRotatedAddr] = useState<string | null>(null);
   const [kycUrl, setKycUrl] = useState("");
@@ -69,6 +72,7 @@ function AdminConfig() {
     setNativeSymbol(data.chain.nativeSymbol);
     setAdminWallet(data.adminWallet);
     setKycAuto(data.kyc.autoApprove);
+    setIpfsGateway(data.chain.ipfsGateway);
   }
 
   useEffect(() => {
@@ -148,6 +152,7 @@ function AdminConfig() {
             {infra.kyc.autoApprove ? " · auto-approve" : " · admin review"}
           </p>
         ) : null}
+        <p className="mt-2 text-xs text-muted">KYC_AUTO_APPROVE set in the server environment overrides this saved setting.</p>
         <div className="mt-4 grid gap-3">
           <div className="grid gap-1.5">
             <Label htmlFor="kyc-url">DATABASE_URL_KYC</Label>
@@ -165,26 +170,28 @@ function AdminConfig() {
             />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={kycAuto} disabled={mainnet} onChange={(e) => setKycAuto(e.target.checked)} />
-            Auto-approve submissions (otherwise they stay pending). Disabled on Gnosis mainnet.
+            <input type="checkbox" checked={kycAuto} onChange={(e) => setKycAuto(e.target.checked)} />
+            Auto-approve submissions (otherwise they stay pending).
           </label>
+          {mainnet && kycAuto ? <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">Mainnet warning: every valid KYC submission will be marked approved automatically, without admin review.</p> : null}
           <div className="flex flex-wrap gap-2">
             <Button
               disabled={busy}
-              onClick={() =>
+              onClick={() => {
+                if (mainnet && kycAuto && !infra?.kyc.autoApprove && !window.confirm("Enable automatic KYC approval on Gnosis mainnet? New valid submissions will be approved without an administrator reviewing the identity documents.")) return;
                 void withBusy(setBusy, async () => {
-                  setInfra(
-                    await saveInfra({
+                  const saved = await saveInfra({
                       data: {
                         kycAutoApprove: kycAuto,
                         ...(kycUrl.trim() ? { databaseUrlKyc: kycUrl.trim() } : {}),
                       },
-                    }),
-                  );
+                    });
+                  setInfra(saved);
+                  setKycAuto(saved.kyc.autoApprove);
                   setKycUrl("");
                   toast.success("KYC settings saved");
-                })
-              }
+                });
+              }}
             >
               Save KYC settings
             </Button>
@@ -193,7 +200,9 @@ function AdminConfig() {
               disabled={busy || infra?.kyc.privateSource === "env"}
               onClick={() =>
                 void withBusy(setBusy, async () => {
-                  setInfra(await saveInfra({ data: { clearDatabaseUrlKyc: true, kycAutoApprove: kycAuto } }));
+                  const saved = await saveInfra({ data: { clearDatabaseUrlKyc: true, kycAutoApprove: kycAuto } });
+                  setInfra(saved);
+                  setKycAuto(saved.kyc.autoApprove);
                   setKycUrl("");
                   toast.success("Cleared saved private URL");
                 })
@@ -268,7 +277,7 @@ function AdminConfig() {
 
         <Card className="p-5">
           <h2 className="font-display text-2xl italic">Pinata</h2>
-          <p className="mt-1 text-sm text-muted">JWT is stored in the database. Event posters use the returned IPFS URL.</p>
+          <p className="mt-1 text-sm text-muted">JWT is stored in the database. New ticket metadata stores content-addressed ipfs:// URIs; this gateway is used only to read and preview content.</p>
           <div className="mt-4 grid gap-3">
             <div className="grid gap-1.5">
               <Label>Pinata JWT</Label>
@@ -294,14 +303,67 @@ function AdminConfig() {
             >
               Save Pinata
             </Button>
+            <div className="mt-2 grid gap-1.5">
+              <Label htmlFor="ipfs-gateway">IPFS read gateway</Label>
+              <Input
+                id="ipfs-gateway"
+                type="url"
+                inputMode="url"
+                placeholder="https://gateway.example.com"
+                value={ipfsGateway}
+                onChange={(e) => setIpfsGateway(e.target.value)}
+              />
+              <p className="text-xs text-muted">Use a public HTTPS gateway with anonymous read access. The app uses it to resolve ipfs:// links; the blockchain URI stays ipfs://CID for explorer compatibility.</p>
+            </div>
+            <Button
+              variant="outline"
+              disabled={busy || !ipfsGateway.trim()}
+              onClick={() =>
+                void withBusy(setBusy, async () => {
+                  setInfra(await saveInfra({ data: { ipfsGateway: ipfsGateway.trim() } }));
+                  toast.success("IPFS gateway saved");
+                })
+              }
+            >
+              Save gateway
+            </Button>
           </div>
         </Card>
       </div>
 
+      <Card className="mt-4 border-danger/40 p-5">
+        <h2 className="font-display text-2xl italic">Reset application data</h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Permanently removes app records, organizers, listings, balances, KYC records and stored KYC photos from this installation, including the separate KYC database if configured. Admin access, network settings, signer configuration and other setup values are preserved. This does not undo blockchain transactions or remove deployed contracts, tickets, or funds on-chain.
+        </p>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <div className="grid min-w-64 flex-1 gap-1.5">
+            <Label htmlFor="reset-phrase">Type RESET APPLICATION DATA to enable</Label>
+            <Input id="reset-phrase" value={resetPhrase} onChange={(e) => setResetPhrase(e.target.value)} autoComplete="off" />
+          </div>
+          <Button
+            variant="danger"
+            disabled={busy || resetPhrase !== "RESET APPLICATION DATA"}
+            onClick={() => {
+              if (!window.confirm("Permanently clear this installation's app and KYC data? On-chain activity will remain and cannot be rolled back by this reset.")) return;
+              void withBusy(setBusy, async () => {
+                const result = await resetApplicationData({ data: { confirmation: resetPhrase } });
+                setResetPhrase("");
+                await load();
+                toast.success(`Application data reset · removed ${result.removedKycPhotos} KYC photo(s)`);
+                if (result.photoCleanupWarning) toast.error(result.photoCleanupWarning);
+              });
+            }}
+          >
+            Clear app data
+          </Button>
+        </div>
+      </Card>
+
       <Card className="mt-4 p-5">
         <h2 className="font-display text-2xl italic">Network & signer</h2>
         <p className="mt-1 text-sm text-muted">Active network: <strong>{infra?.chain.chainName || chainName}</strong> · chain ID {infra?.chain.chainId ?? chainId}. Each network needs its own deployment and database.</p>
-        {mainnet ? <p className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">Gnosis mainnet is selected. Dev mode, test DxDAI, and KYC auto-approval are disabled.</p> : null}
+        {mainnet ? <p className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">Gnosis mainnet is selected. Dev mode will deploy a DxDAI contract on the live network and use that token in app flows. It is not an isolated test environment.</p> : null}
         <p className="mt-1 text-sm text-muted">
           RPC and admin address are public. The operator private key is written only to the
           database after it is connected.
@@ -419,7 +481,7 @@ function AdminConfig() {
                 setRotatedAddr(made.address);
                 setOperatorPk("");
                 await load();
-                toast.success("New signer saved in the database. Fund this address with Chiado xDAI.");
+                toast.success(`New signer saved in the database. Fund this address with ${nativeSymbol || "the native token"} on ${chainName || "the selected network"}.`);
               })
             }
           >
@@ -457,10 +519,11 @@ function AdminConfig() {
           </div>
           <Button
             className="mt-4"
-            disabled={busy || !infra?.setup.signer || mainnet}
+            disabled={busy || !infra?.setup.signer}
             onClick={() =>
               void withBusy(setBusy, async () => {
                 const enabling = !infra?.chain.devMode;
+                if (enabling && mainnet && !window.confirm("Deploy a DxDAI contract on live Gnosis mainnet and switch app payment flows to that token? This sends a real mainnet transaction.")) return;
                 await chain.run({
                   title: enabling ? "Turn on test coins" : "Turn off test coins",
                   labels: enabling
@@ -481,7 +544,7 @@ function AdminConfig() {
           </Button>
         </Card>
 
-        <Card className="p-5">
+          <Card className="p-5">
           <Label>Secondary royalty (%)</Label>
           <p className="mt-1 text-xs text-muted">Taken from the seller on every resale, into that event’s vault.</p>
           <div className="mt-3 flex gap-2">

@@ -198,7 +198,7 @@ function EventPage() {
         <div className="mt-3 grid gap-1 text-xs text-muted">
           {receipt.collection ? <a className="text-primary underline" href={explorerAddress(receipt.collection, explorer)} target="_blank" rel="noreferrer">Collection {shortAddr(receipt.collection)}</a> : null}
           {receipt.collection ? <a className="text-primary underline" href={explorerToken(receipt.collection, receipt.tokenId, explorer)} target="_blank" rel="noreferrer">Token #{receipt.tokenId} in explorer</a> : null}
-          {receipt.tokenUri ? <a className="text-primary underline" href={gatewayUrl(receipt.tokenUri)} target="_blank" rel="noreferrer">Open ticket details</a> : null}
+          {receipt.tokenUri ? <a className="text-primary underline" href={gatewayUrl(receipt.tokenUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">Open ticket details</a> : null}
           <span>Explorer images can take time to appear. Open the details to check the JSON and image.</span>
         </div>
       ) : null} />

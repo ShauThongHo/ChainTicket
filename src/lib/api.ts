@@ -373,6 +373,7 @@ export const saveInfra = createServerFn({ method: "POST" })
       explorerUrl: z.string().optional(),
       operatorPk: z.string().optional(),
       pinataJwt: z.string().optional(),
+      ipfsGateway: z.string().optional(),
       clearOperatorPk: z.boolean().optional(),
       clearDatabaseUrl: z.boolean().optional(),
       clearPinata: z.boolean().optional(),
@@ -387,6 +388,16 @@ export const saveInfra = createServerFn({ method: "POST" })
     const { getSql } = await import("@/lib/db");
     const { applyInfra } = await import("@/lib/engine.server");
     return applyInfra(await getSql(), wallet, data);
+  });
+
+export const resetApplicationData = createServerFn({ method: "POST" })
+  .middleware([walletMiddleware])
+  .validator(z.object({ confirmation: z.string() }))
+  .handler(async ({ context, data }) => {
+    const wallet = needWallet(context.wallet);
+    const { getSql } = await import("@/lib/db");
+    const { resetApplicationData } = await import("@/lib/engine.server");
+    return resetApplicationData(await getSql(), wallet, data.confirmation);
   });
 
 export const testDatabase = createServerFn({ method: "POST" })
