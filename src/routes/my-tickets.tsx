@@ -33,6 +33,12 @@ function MyTicketsPage() {
     if (me) void reload();
   }, [me]);
 
+  useEffect(() => {
+    if (!me) return;
+    const id = setInterval(() => void reload(), 5000);
+    return () => clearInterval(id);
+  }, [me]);
+
   const upcoming = tickets.filter((t) => t.status === "owned" || t.status === "listed").length;
 
   if (!me) {
@@ -280,7 +286,15 @@ function TicketCard({ ticket, onChange }: { ticket: MyTicket; onChange: () => vo
           </p>
         ) : null}
         <ChainDialog {...chain} onClose={chain.close} />
-        {live && (ticket.status === "owned" || ticket.status === "listed") ? (
+        {live && ticket.status === "listed" ? (
+          <div className="mt-4 flex flex-wrap items-end gap-2">
+            <p className="text-sm text-muted">This ticket is listed. Delist it before using its gate QR.</p>
+            <Button variant="outline" disabled={busy} onClick={() => void delist()}>
+              {busy ? "Sending…" : `Delist ${ticket.listPriceCents ? formatAmount(ticket.listPriceCents, symbol) : ""}`}
+            </Button>
+          </div>
+        ) : null}
+        {live && ticket.status === "owned" ? (
           <div className="mt-4 flex flex-wrap items-end gap-2">
             <div>
               <p className="text-xs text-muted">
@@ -292,15 +306,9 @@ function TicketCard({ ticket, onChange }: { ticket: MyTicket; onChange: () => vo
                 onChange={(e) => setPrice(e.target.value)}
               />
             </div>
-            {ticket.status === "listed" ? (
-              <Button variant="outline" disabled={busy} onClick={() => void delist()}>
-                {busy ? "Sending…" : `Delist ${ticket.listPriceCents ? formatAmount(ticket.listPriceCents, symbol) : ""}`}
-              </Button>
-            ) : (
-              <Button variant="outline" disabled={busy} onClick={() => void list()}>
-                {busy ? "Sending…" : "List in pool"}
-              </Button>
-            )}
+            <Button variant="outline" disabled={busy} onClick={() => void list()}>
+              {busy ? "Sending…" : "List in pool"}
+            </Button>
           </div>
         ) : null}
         {canVote ? (

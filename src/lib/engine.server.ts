@@ -1013,6 +1013,9 @@ export async function issueQr(sql: Sql, wallet: string, ticketId: number): Promi
   if (ticket.status === "used") {
     return { locked: true, unlocksAt: null, reason: "Already checked in." };
   }
+  if (ticket.status === "listed") {
+    return { locked: true, unlocksAt: null, reason: "Ticket is listed for sale. Delist it before using a gate QR." };
+  }
   if (ticket.status === "refunded") {
     return { locked: true, unlocksAt: null, reason: "Ticket was refunded." };
   }
@@ -1293,9 +1296,6 @@ export async function mintEvent(
     }
     void mintTx;
   }
-  if (jobId) {
-    await sql`update mint_jobs set status = 'done', current_step = ${input.tiers.length * 2 + (bank ? 7 : 6)}, event_id = ${ev.id}, updated_at = now() where id = ${jobId} and organizer_wallet = ${wallet}`;
-  }
   await writeLedger(sql, {
     eventId: ev.id,
     kind: "mint",
@@ -1303,6 +1303,9 @@ export async function mintEvent(
     amount: 0,
     tx: deployed.marketTx,
   });
+  if (jobId) {
+    await sql`update mint_jobs set status = 'done', current_step = ${input.tiers.length * 2 + (bank ? 7 : 6)}, event_id = ${ev.id}, updated_at = now() where id = ${jobId} and organizer_wallet = ${wallet}`;
+  }
   return {
     eventId: ev.id,
     vault: deployed.vault,
@@ -1314,11 +1317,13 @@ export async function mintEvent(
 }
 
 export async function mintJobProgress(sql: Sql, wallet: string, jobId: string) {
-  const row = (await sql<{ current_step: number; status: string; error: string | null; event_id: number | null }>`
-    select current_step, status, error, event_id from mint_jobs where id = ${jobId} and organizer_wallet = ${wallet}
+  const row = (await sql<{ current_step: number; status: string; error: string | null; event_id: number | null; collection_address: string | null }>`
+    select j.current_step, j.status, j.error, j.event_id, e.collection_address
+    from mint_jobs j left join events e on e.id = j.event_id
+    where j.id = ${jobId} and j.organizer_wallet = ${wallet}
   `)[0];
-  if (!row) return { currentStep: 0, status: "pending", error: null, eventId: null };
-  return { currentStep: row.current_step, status: row.status, error: row.error, eventId: row.event_id };
+  if (!row) return { currentStep: 0, status: "pending", error: null, eventId: null, collectionAddress: null };
+  return { currentStep: row.current_step, status: row.status, error: row.error, eventId: row.event_id, collectionAddress: row.collection_address };
 }
 
 export async function failMintJob(sql: Sql, wallet: string, jobId: string, error: string) {

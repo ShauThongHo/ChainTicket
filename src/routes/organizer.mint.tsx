@@ -117,15 +117,40 @@ function MintPage() {
           let createFinished = false;
           let mintResult: Awaited<ReturnType<typeof createEvent>> | null = null;
           let mintError: unknown;
+          let completedProgress: Awaited<ReturnType<typeof fetchMintProgress>> | null = null;
           void creating.then((result) => { mintResult = result; createFinished = true; }, (error: unknown) => { mintError = error; createFinished = true; });
           while (!createFinished) {
             const progress = await fetchMintProgress({ data: { jobId } });
+            completedProgress = progress;
             advance(Math.min(progress.currentStep, labels.length - 1));
-            if (progress.status === "failed") break;
+            if (progress.status === "failed" || progress.status === "done") break;
             await new Promise((resolve) => setTimeout(resolve, 700));
           }
-          if (mintError) throw mintError;
-          const res = mintResult ?? await creating;
+          if (mintError) {
+            if (completedProgress?.status !== "done" || !completedProgress.collectionAddress) throw mintError;
+            advance(labels.length - 1);
+            setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
+            return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
+          }
+          let res: Awaited<ReturnType<typeof createEvent>>;
+          try {
+            res = mintResult ?? await creating;
+          } catch (error) {
+            if (completedProgress?.status === "done" && completedProgress.collectionAddress) {
+              advance(labels.length - 1);
+              setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
+              return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
+            }
+            throw error;
+          }
+          if (!res?.collection) {
+            if (completedProgress?.status === "done" && completedProgress.collectionAddress) {
+              advance(labels.length - 1);
+              setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
+              return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
+            }
+            throw new Error("Event creation finished without returning its ticket collection address. Check the organizer workspace before retrying.");
+          }
           advance(labels.length - 1);
           setMintReceipt({ collection: res.collection, metadata: res.metadata });
           return `Your event is ready. Ticket collection ${shortAddr(res.collection)}.`;
