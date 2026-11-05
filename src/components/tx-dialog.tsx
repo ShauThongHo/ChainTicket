@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Loader2 } from "lucide-react";
 import { TxProgress, markSteps, type TxStep } from "@/components/tx-progress";
 import { Button } from "@/components/ui/button";
-import { friendlyChainError } from "@/lib/chain-errors";
+import { friendlyChainError, isWalletRejection } from "@/lib/chain-errors";
 
 export function ModalShell({
   title,
@@ -197,8 +197,9 @@ export function useChainRun() {
       setSummary(text);
       setError(null);
     } catch (e) {
+      const cancelled = isWalletRejection(e);
       setSteps(markSteps(opts.labels, stepRef.current, true));
-      setError(friendlyChainError(e));
+      setError(cancelled ? "Wallet request cancelled. Your event or ticket was not changed. Close this message and try again when ready." : friendlyChainError(e));
       setSummary(null);
       opts.onError?.(e);
     }

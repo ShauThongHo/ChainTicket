@@ -218,6 +218,7 @@ export const createEvent = createServerFn({ method: "POST" })
       startsAt: z.string(),
       endsAt: z.string(),
       jobId: z.string().min(1).max(80),
+      steps: z.array(z.string()).max(40),
       tiers: z.array(
         z.object({
           name: z.string(),
@@ -233,7 +234,7 @@ export const createEvent = createServerFn({ method: "POST" })
     const sql = await getSql();
     const { boot, mintEvent, failMintJob } = await import("@/lib/engine.server");
     await boot(sql);
-    await sql`insert into mint_jobs (id, organizer_wallet, status) values (${data.jobId}, ${wallet}, 'pending')`;
+    await sql`insert into mint_jobs (id, organizer_wallet, status, event_name, steps) values (${data.jobId}, ${wallet}, 'pending', ${data.name}, ${JSON.stringify(data.steps)}::jsonb)`;
     try {
       return await mintEvent(sql, wallet, data, data.jobId);
     } catch (err) {
@@ -250,6 +251,15 @@ export const fetchMintProgress = createServerFn({ method: "GET" })
     const { getSql } = await import("@/lib/db");
     const { mintJobProgress } = await import("@/lib/engine.server");
     return mintJobProgress(await getSql(), wallet, data.jobId);
+  });
+
+export const fetchLatestMintJob = createServerFn({ method: "GET" })
+  .middleware([walletMiddleware])
+  .handler(async ({ context }) => {
+    const wallet = needWallet(context.wallet);
+    const { getSql } = await import("@/lib/db");
+    const { latestMintJob } = await import("@/lib/engine.server");
+    return latestMintJob(await getSql(), wallet);
   });
 
 export const fetchOrganizer = createServerFn({ method: "GET" })

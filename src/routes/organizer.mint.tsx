@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { useSession } from "@/components/session";
 import { ChainDialog, useChainRun } from "@/components/tx-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createEvent, fetchMintProgress, uploadPoster } from "@/lib/api";
+import { createEvent, fetchLatestMintJob, fetchMintProgress, uploadPoster } from "@/lib/api";
 import { friendlyChainError } from "@/lib/chain-errors";
 import { shortAddr } from "@/lib/utils";
 import { explorerAddress, gatewayUrl } from "@/lib/explorer";
@@ -52,9 +53,72 @@ function MintPage() {
     { name: "General Admission", face: "40.00", supply: "12" },
   ]);
   const [busy, setBusy] = useState(false);
+  const [latestJob, setLatestJob] = useState<Awaited<ReturnType<typeof fetchLatestMintJob>>>(null);
+  const resumedJob = useRef<string | null>(null);
   const [mintReceipt, setMintReceipt] = useState<{ collection: string; metadata: { tierName: string; tokenUri: string; tokenId: number }[] } | null>(null);
   const chain = useChainRun();
   const symbol = config?.nativeSymbol ?? "xDAI";
+
+  async function watchMintJob(jobId: string, labels: string[], advance: (index: number) => void) {
+    while (true) {
+      let progress: Awaited<ReturnType<typeof fetchMintProgress>>;
+      try {
+        progress = await fetchMintProgress({ data: { jobId } });
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      setLatestJob({
+        jobId,
+        currentStep: progress.currentStep,
+        status: progress.status,
+        error: progress.error,
+        eventId: progress.eventId,
+        collectionAddress: progress.collectionAddress,
+        eventName: progress.eventName,
+        steps: progress.steps,
+        updatedAt: new Date().toISOString(),
+      });
+      advance(Math.min(progress.currentStep, labels.length));
+      if (progress.status === "failed") throw new Error(progress.error || "Event creation failed.");
+      if (progress.status === "success") {
+        if (!progress.collectionAddress) throw new Error("Creation is marked successful but the collection address is missing.");
+        setMintReceipt({ collection: progress.collectionAddress, metadata: [] });
+        advance(labels.length);
+        return `Your event is ready. Ticket collection ${shortAddr(progress.collectionAddress)}.`;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!me?.isOrganizer) return;
+    const refresh = async () => {
+      try {
+        const job = await fetchLatestMintJob();
+        if (cancelled || !job) return;
+        setLatestJob(job);
+        if (job.status !== "pending" && job.status !== "running") return;
+        if (resumedJob.current === job.jobId) return;
+        resumedJob.current = job.jobId;
+        setBusy(true);
+        const labels = job.steps.length ? job.steps : ["Waiting for event creation"];
+        void chain.run({
+          title: `Creating ${job.eventName || "your event"}`,
+          labels,
+          doneLabel: "Back to workspace",
+          onDone: () => navigate({ to: "/organizer" }),
+          task: (advance) => watchMintJob(job.jobId, labels, advance),
+        }).finally(() => setBusy(false));
+      } catch {
+        // Keep checking; a temporary disconnect does not change the persisted job state.
+      }
+    };
+    void refresh();
+    const interval = setInterval(() => void refresh(), 1500);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [me?.isOrganizer]);
 
   async function onPoster(file: File) {
     setUploading(true);
@@ -88,18 +152,24 @@ function MintPage() {
       "Save event and ticket inventory",
     ];
     try {
-      await chain.run({
-        title: "Creating your event",
-        labels,
-        doneLabel: "Back to workspace",
-        onDone: () => navigate({ to: "/organizer" }),
-        task: async (advance) => {
-          setMintReceipt(null);
-          advance(1);
-          const jobId = crypto.randomUUID();
-          const creating = createEvent({
+      const jobId = crypto.randomUUID();
+      resumedJob.current = jobId;
+      setMintReceipt(null);
+      setLatestJob({
+        jobId,
+        currentStep: 0,
+        status: "pending",
+        error: null,
+        eventId: null,
+        collectionAddress: null,
+        eventName: name,
+        steps: labels,
+        updatedAt: new Date().toISOString(),
+      });
+      void createEvent({
         data: {
           jobId,
+          steps: labels,
           name,
           venue,
           category,
@@ -113,48 +183,13 @@ function MintPage() {
             supply: Number(t.supply),
           })),
         },
-          });
-          let createFinished = false;
-          let mintResult: Awaited<ReturnType<typeof createEvent>> | null = null;
-          let mintError: unknown;
-          let completedProgress: Awaited<ReturnType<typeof fetchMintProgress>> | null = null;
-          void creating.then((result) => { mintResult = result; createFinished = true; }, (error: unknown) => { mintError = error; createFinished = true; });
-          while (!createFinished) {
-            const progress = await fetchMintProgress({ data: { jobId } });
-            completedProgress = progress;
-            advance(Math.min(progress.currentStep, labels.length - 1));
-            if (progress.status === "failed" || progress.status === "done") break;
-            await new Promise((resolve) => setTimeout(resolve, 700));
-          }
-          if (mintError) {
-            if (completedProgress?.status !== "done" || !completedProgress.collectionAddress) throw mintError;
-            advance(labels.length - 1);
-            setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
-            return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
-          }
-          let res: Awaited<ReturnType<typeof createEvent>>;
-          try {
-            res = mintResult ?? await creating;
-          } catch (error) {
-            if (completedProgress?.status === "done" && completedProgress.collectionAddress) {
-              advance(labels.length - 1);
-              setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
-              return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
-            }
-            throw error;
-          }
-          if (!res?.collection) {
-            if (completedProgress?.status === "done" && completedProgress.collectionAddress) {
-              advance(labels.length - 1);
-              setMintReceipt({ collection: completedProgress.collectionAddress, metadata: [] });
-              return `Your event is ready. Ticket collection ${shortAddr(completedProgress.collectionAddress)}.`;
-            }
-            throw new Error("Event creation finished without returning its ticket collection address. Check the organizer workspace before retrying.");
-          }
-          advance(labels.length - 1);
-          setMintReceipt({ collection: res.collection, metadata: res.metadata });
-          return `Your event is ready. Ticket collection ${shortAddr(res.collection)}.`;
-        },
+      }).catch(() => undefined);
+      await chain.run({
+        title: "Creating your event",
+        labels,
+        doneLabel: "Back to workspace",
+        onDone: () => navigate({ to: "/organizer" }),
+        task: (advance) => watchMintJob(jobId, labels, advance),
       });
     } catch (err) {
       toast.error(friendlyChainError(err));
@@ -177,6 +212,26 @@ function MintPage() {
       <p className="mt-2 max-w-xl text-sm text-muted">
         Add the show and the tickets you want to sell.
       </p>
+      {latestJob ? (
+        <Card className="mt-5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">Latest event creation</p>
+              <p className="mt-1 font-medium">{latestJob.eventName || "Event creation"}</p>
+            </div>
+            <Badge tone={latestJob.status === "success" || latestJob.status === "done" ? "sage" : latestJob.status === "failed" ? "danger" : "ink"}>
+              {latestJob.status === "success" || latestJob.status === "done" ? "Success" : latestJob.status === "failed" ? "Failed" : "In progress"}
+            </Badge>
+          </div>
+          {latestJob.status === "failed" && latestJob.error ? <p className="mt-2 text-sm text-danger">{latestJob.error}</p> : null}
+          {latestJob.collectionAddress ? (
+            <a className="mt-2 inline-block text-sm text-primary underline" href={explorerAddress(latestJob.collectionAddress, config?.explorerUrl ?? "")} target="_blank" rel="noreferrer">
+              Collection {shortAddr(latestJob.collectionAddress)}
+            </a>
+          ) : null}
+          {latestJob.status === "pending" || latestJob.status === "running" ? <p className="mt-2 text-xs text-muted">This task is saved. Reopen this page any time to continue watching its result.</p> : null}
+        </Card>
+      ) : null}
       <ChainDialog {...chain} onClose={chain.close} successDetails={mintReceipt ? (
         <div className="mt-3 grid gap-1 text-xs text-muted">
           <a className="text-primary underline" href={explorerAddress(mintReceipt.collection, config?.explorerUrl ?? "")} target="_blank" rel="noreferrer">

@@ -13,7 +13,6 @@ import artifacts from "@/lib/abi/core.json";
 import { readPlatform } from "@/lib/platform";
 import { getSql } from "@/lib/db";
 import { loadInfra } from "@/lib/infra.server";
-import { RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS } from "@/lib/receipt";
 import { assertChainIdMatches } from "@/lib/network-config";
 
 const globalRef = globalThis as typeof globalThis & {
@@ -50,9 +49,36 @@ export async function readClient() {
   const c = await cfg();
   const chain = chainOf(c.chainId, c.rpcUrl, c.explorerUrl, c.chainName, c.nativeSymbol);
   const publicClient = createPublicClient({ chain, transport: http(c.rpcUrl, { timeout: 20_000 }) });
-  const actualChainId = await publicClient.getChainId();
+  const actualChainId = await retryRpc(() => publicClient.getChainId());
   assertChainIdMatches(c.chainId, actualChainId);
   return { c, chain, publicClient };
+}
+
+function retryableRpcError(err: unknown) {
+  const seen = new Set<unknown>();
+  const parts: string[] = [];
+  let current: unknown = err;
+  for (let depth = 0; depth < 6 && current && !seen.has(current); depth += 1) {
+    seen.add(current);
+    if (typeof current !== "object") break;
+    const value = current as { name?: unknown; shortMessage?: unknown; message?: unknown; cause?: unknown };
+    parts.push(...[value.name, value.shortMessage, value.message].filter((x): x is string => typeof x === "string"));
+    current = value.cause;
+  }
+  const text = parts.join(" ").toLowerCase();
+  return /httprequest|timeout|socket|network|fetch/.test(text) ||
+    /failed to fetch|network error|timed? out|timeout|socket|econn|connection reset|connection refused|temporarily unavailable|too many requests|\b429\b|\b502\b|\b503\b|\b504\b/.test(text);
+}
+
+async function retryRpc<T>(read: () => Promise<T>): Promise<T> {
+  while (true) {
+    try {
+      return await read();
+    } catch (err) {
+      if (!retryableRpcError(err)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
 }
 
 export async function clients() {
@@ -125,13 +151,20 @@ function note(hash: string, kind: string) {
 }
 
 async function wait(publicClient: Awaited<ReturnType<typeof readClient>>["publicClient"], hash: Hex) {
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash,
-    timeout: RECEIPT_TIMEOUT_MS,
-    confirmations: RECEIPT_CONFIRMATIONS,
-  });
-  if (receipt.status !== "success") throw new Error("On-chain transaction reverted.");
-  return receipt;
+  while (true) {
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        timeout: 0,
+        confirmations: 1,
+      });
+      if (receipt.status !== "success") throw new Error("On-chain transaction reverted.");
+      return receipt;
+    } catch (err) {
+      if (err instanceof Error && err.message === "On-chain transaction reverted.") throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
 }
 
 export async function waitReceipt(hash: Hex) {
@@ -161,11 +194,11 @@ export async function assertDemoBank(bank: `0x${string}`) {
   const { publicClient } = await readClient();
   let name = "";
   try {
-    name = (await publicClient.readContract({
+    name = (await retryRpc(() => publicClient.readContract({
       address: bank,
       abi: artifacts.DemoBank.abi,
       functionName: "name",
-    })) as string;
+    }))) as string;
   } catch {
     throw new Error(
       "Saved DemoBank is not a readable DxDAI contract. Turn Dev mode off then on to mint a fresh bank.",
@@ -298,17 +331,17 @@ export async function setTierUriOnChain(opts: {
   let collection: `0x${string}`;
   let actual: string;
   try {
-    collection = await publicClient.readContract({
+    collection = await retryRpc(() => publicClient.readContract({
       address: opts.marketplace,
       abi: artifacts.EventMarketplace.abi,
       functionName: "collection",
-    }) as `0x${string}`;
-    actual = await publicClient.readContract({
+    })) as `0x${string}`;
+    actual = await retryRpc(() => publicClient.readContract({
       address: collection,
       abi: artifacts.TicketCollection.abi,
       functionName: "tierURI",
       args: [opts.tierId],
-    }) as string;
+    })) as string;
   } catch (err) {
     const detail = err instanceof Error ? err.message : "RPC read failed";
     throw new Error(`Metadata URI readback failed after writing collection ${opts.marketplace}, tier ${opts.tierId}: ${detail}`);
@@ -320,12 +353,12 @@ export async function setTierUriOnChain(opts: {
 
 export async function readTicketTokenUri(collection: `0x${string}`, tokenId: number) {
   const { publicClient } = await readClient();
-  return await publicClient.readContract({
+  return await retryRpc(() => publicClient.readContract({
     address: collection,
     abi: artifacts.TicketCollection.abi,
     functionName: "tokenURI",
     args: [BigInt(tokenId)],
-  }) as string;
+  })) as string;
 }
 
 export async function mintTierOnChain(opts: {

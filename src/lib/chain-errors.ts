@@ -155,6 +155,17 @@ export function friendlyChainError(err: unknown): string {
   return cleaned;
 }
 
+export function isWalletRejection(err: unknown): boolean {
+  const lower = collectText(err).toLowerCase();
+  return (
+    lower.includes("user rejected") ||
+    lower.includes("user denied") ||
+    lower.includes("rejected the request") ||
+    lower.includes("action_rejected") ||
+    /\b4001\b/.test(lower)
+  );
+}
+
 export function isInventoryRace(err: unknown): boolean {
   const reason = extractRevertReason(err)?.toLowerCase();
   if (reason === "st" || reason === "inactive" || reason === "val" || reason === "ended") return true;

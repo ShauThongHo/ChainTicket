@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toChainHex } from "@/lib/explorer";
-import { RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS } from "@/lib/receipt";
+import { RECEIPT_CONFIRMATIONS } from "@/lib/receipt";
 import { friendlyChainError } from "@/lib/chain-errors";
 import type { PublicConfig } from "@/lib/types";
 import { assertChainIdMatches } from "@/lib/network-config";
@@ -187,11 +187,19 @@ export async function sendUserCall(
       });
     }
     hooks?.onSubmitted?.(hash);
-    const receipt = await publicClient.waitForTransactionReceipt({
-      hash,
-      timeout: RECEIPT_TIMEOUT_MS,
-      confirmations: RECEIPT_CONFIRMATIONS,
-    });
+    let receipt: Awaited<ReturnType<typeof publicClient.waitForTransactionReceipt>>;
+    while (true) {
+      try {
+        receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+          timeout: 0,
+          confirmations: RECEIPT_CONFIRMATIONS,
+        });
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
     if (receipt.status !== "success") {
       throw new Error("Sold out or this listing is no longer active. Refresh and try again.");
     }

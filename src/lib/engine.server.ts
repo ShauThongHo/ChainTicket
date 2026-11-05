@@ -153,9 +153,16 @@ async function runBoot(sql: Sql) {
       status text not null default 'pending',
       error text,
       event_id integer,
+      event_name text not null default '',
+      steps jsonb not null default '[]'::jsonb,
+      created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
   `;
+  await sql`alter table mint_jobs add column if not exists event_name text not null default ''`;
+  await sql`alter table mint_jobs add column if not exists steps jsonb not null default '[]'::jsonb`;
+  await sql`alter table mint_jobs add column if not exists created_at timestamptz not null default now()`;
+  await sql`update mint_jobs set status = 'success' where status = 'done'`;
   await sql`
     create table if not exists infra_settings (
       key text primary key,
@@ -1304,7 +1311,7 @@ export async function mintEvent(
     tx: deployed.marketTx,
   });
   if (jobId) {
-    await sql`update mint_jobs set status = 'done', current_step = ${input.tiers.length * 2 + (bank ? 7 : 6)}, event_id = ${ev.id}, updated_at = now() where id = ${jobId} and organizer_wallet = ${wallet}`;
+    await sql`update mint_jobs set status = 'success', current_step = ${input.tiers.length * 2 + (bank ? 7 : 6)}, event_id = ${ev.id}, updated_at = now() where id = ${jobId} and organizer_wallet = ${wallet}`;
   }
   return {
     eventId: ev.id,
@@ -1317,13 +1324,24 @@ export async function mintEvent(
 }
 
 export async function mintJobProgress(sql: Sql, wallet: string, jobId: string) {
-  const row = (await sql<{ current_step: number; status: string; error: string | null; event_id: number | null; collection_address: string | null }>`
-    select j.current_step, j.status, j.error, j.event_id, e.collection_address
+  const row = (await sql<{ current_step: number; status: string; error: string | null; event_id: number | null; collection_address: string | null; event_name: string; steps: string[] }>`
+    select j.current_step, j.status, j.error, j.event_id, j.event_name, j.steps, e.collection_address
     from mint_jobs j left join events e on e.id = j.event_id
     where j.id = ${jobId} and j.organizer_wallet = ${wallet}
   `)[0];
-  if (!row) return { currentStep: 0, status: "pending", error: null, eventId: null, collectionAddress: null };
-  return { currentStep: row.current_step, status: row.status, error: row.error, eventId: row.event_id, collectionAddress: row.collection_address };
+  if (!row) return { currentStep: 0, status: "pending", error: null, eventId: null, collectionAddress: null, eventName: "", steps: [] as string[] };
+  return { currentStep: row.current_step, status: row.status, error: row.error, eventId: row.event_id, collectionAddress: row.collection_address, eventName: row.event_name, steps: row.steps ?? [] };
+}
+
+export async function latestMintJob(sql: Sql, wallet: string) {
+  const row = (await sql<{ id: string; current_step: number; status: string; error: string | null; event_id: number | null; collection_address: string | null; event_name: string; steps: string[]; updated_at: string }>`
+    select j.id, j.current_step, j.status, j.error, j.event_id, e.collection_address, j.event_name, j.steps, j.updated_at
+    from mint_jobs j left join events e on e.id = j.event_id
+    where j.organizer_wallet = ${wallet}
+    order by j.created_at desc limit 1
+  `)[0];
+  if (!row) return null;
+  return { jobId: row.id, currentStep: row.current_step, status: row.status, error: row.error, eventId: row.event_id, collectionAddress: row.collection_address, eventName: row.event_name, steps: row.steps ?? [], updatedAt: row.updated_at };
 }
 
 export async function failMintJob(sql: Sql, wallet: string, jobId: string, error: string) {
