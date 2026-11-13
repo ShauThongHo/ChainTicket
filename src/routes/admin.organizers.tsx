@@ -49,16 +49,11 @@ function OrganizersPage() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted">Access</p>
-          <h1 className="font-display text-4xl italic">Verified organizers</h1>
-          <p className="mt-2 max-w-xl text-sm text-muted">
-            Paste a venue wallet and approve it. Connecting that wallet later opens the organizer
-            dashboard automatically. The platform admin is not an organizer.
-          </p>
-        </div>
-        <Button asChild variant="outline">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
+          Verified Organizers
+        </h1>
+        <Button asChild variant="outline" size="sm">
           <Link to="/admin">Dashboard</Link>
         </Button>
       </div>
@@ -90,7 +85,7 @@ function OrganizersPage() {
               }
             }}
           >
-            Verify & add
+            Add Organizer
           </Button>
         </div>
       </Card>

@@ -1,5 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
+  Info,
+  Lock,
+  MapPin,
+  QrCode,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Ticket,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { PhaseBadge } from "@/components/phase-badge";
@@ -10,8 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import artifacts from "@/lib/abi/core.json";
 import { buyNow, fetchEvent, quoteBuy } from "@/lib/api";
-import { friendlyChainError, isInventoryRace } from "@/lib/chain-errors";
-import { explorerAddress, explorerTx, explorerToken, gatewayUrl } from "@/lib/explorer";
+import { isInventoryRace } from "@/lib/chain-errors";
+import { explorerAddress, explorerToken, explorerTx, gatewayUrl } from "@/lib/explorer";
 import type { EventDetail } from "@/lib/types";
 import { formatAmount, paySymbol, shortAddr } from "@/lib/utils";
 
@@ -25,7 +41,11 @@ function EventPage() {
   const chain = useChainRun();
   const [ev, setEv] = useState<EventDetail | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
-  const [receipt, setReceipt] = useState<{ collection: string | null; tokenId: string; tokenUri: string | null } | null>(null);
+  const [receipt, setReceipt] = useState<{
+    collection: string | null;
+    tokenId: string;
+    tokenUri: string | null;
+  } | null>(null);
   const symbol = paySymbol(config);
   const explorer = config?.explorerUrl ?? "";
 
@@ -40,34 +60,43 @@ function EventPage() {
     }
     if (!me.kyc || me.kyc.status !== "approved") {
       if (me.kyc?.status === "expired") {
-        toast.error("This ID has expired. Submit KYC again.");
+        toast.error("Your KYC credential has expired. Please resubmit verification.");
       }
       navigate({ to: "/kyc", search: { next: `/events/${id}` } });
       return;
     }
     setBusy(tierId);
-    const labels = ["Check price and stock", "Confirm payment in your wallet", "Wait for chain confirmation", "Save your ticket"];
+    const labels = [
+      "Check price and stock",
+      "Confirm payment in your wallet",
+      "Wait for chain confirmation",
+      "Save your ticket",
+    ];
     setReceipt(null);
     try {
       await chain.run({
-        title: "Your ticket is on its way",
+        title: "Your ticket pass is on its way",
         labels,
-        doneLabel: "View my tickets",
+        doneLabel: "View in My Tickets",
         onDone: () => navigate({ to: "/my-tickets" }),
         retry: () => void buy(tierId),
         onError: (error) => {
-          if (isInventoryRace(error)) void fetchEvent({ data: { id } }).then(setEv).catch(() => undefined);
+          if (isInventoryRace(error)) {
+            void fetchEvent({ data: { id } })
+              .then(setEv)
+              .catch(() => undefined);
+          }
         },
         task: async (advance) => {
           const quote = await quoteBuy({ data: { tierId } });
           if (!quote.payNative) {
             if (quote.marketPull === false) {
               throw new Error(
-                "This ticket window cannot take test coins. Ask an admin to turn Dev mode off and on, then publish the show again.",
+                "This ticket window cannot take test coins. Ask an admin to toggle Dev mode and republish the event.",
               );
             }
             if (quote.dxdaiWei == null || BigInt(quote.dxdaiWei) < BigInt(quote.priceWei)) {
-              throw new Error("Not enough test coins. Claim them on the shows page, then try again.");
+              throw new Error("Not enough test coins. Claim 100 DxDAI on the shows page, then try again.");
             }
           }
           advance(1);
@@ -84,8 +113,12 @@ function EventPage() {
           advance(3);
           const res = await buyNow({ data: { tierId, txHash: hash, chainId: quote.chainId } });
           await refreshBalance(true);
-          setReceipt({ collection: res.collectionAddress ?? null, tokenId: String(res.serial), tokenUri: res.tokenUri ?? null });
-          return `Ticket saved at ${formatAmount(res.priceCents, symbol)}.`;
+          setReceipt({
+            collection: res.collectionAddress ?? null,
+            tokenId: String(res.serial),
+            tokenUri: res.tokenUri ?? null,
+          });
+          return `Ticket pass saved at ${formatAmount(res.priceCents, symbol)}.`;
         },
       });
     } finally {
@@ -93,148 +126,364 @@ function EventPage() {
     }
   }
 
+  function copyText(text: string, label: string) {
+    void navigator.clipboard.writeText(text);
+    toast.success(`Copied ${label} to clipboard`);
+  }
+
   if (!ev) {
     return (
       <AppShell>
-        <p className="text-sm text-muted">Loading event…</p>
+        <div className="py-16 text-center">
+          <div className="mx-auto size-12 rounded-xl shimmer-box mb-4" />
+          <p className="font-mono text-sm text-muted">Retrieving event and ledger details…</p>
+        </div>
       </AppShell>
     );
   }
 
   const stale = ev.engineVersion < 2;
   const closed = ev.phase !== "active";
+  const startDate = new Date(ev.startsAt);
+  const endDate = new Date(ev.endsAt);
 
   return (
     <AppShell>
-      {ev.posterUrl ? (
-        <img src={ev.posterUrl} alt="" className="h-56 w-full rounded-xl object-cover md:h-72" />
-      ) : (
-        <div className="grid h-40 place-items-center rounded-xl border border-dashed border-border text-sm text-muted">
-          No poster
+      {/* TOP NAVIGATION BREADCRUMB */}
+      <div className="mb-6 flex items-center justify-between">
+        <Link
+          to="/marketplace"
+          className="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-fg"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Back to Marketplace</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          {ev.category ? <Badge>{ev.category}</Badge> : null}
+          <PhaseBadge phase={ev.phase} />
+          {ev.frozen ? <Badge tone="danger">Trading Paused</Badge> : null}
         </div>
-      )}
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <Badge>{ev.category}</Badge>
-        <PhaseBadge phase={ev.phase} />
-        {ev.frozen ? <Badge tone="danger">Frozen</Badge> : null}
       </div>
-      <h1 className="mt-3 font-display text-4xl italic">{ev.name}</h1>
-      <p className="mt-2 text-sm text-muted">
-        {new Date(ev.startsAt).toLocaleString()} — {new Date(ev.endsAt).toLocaleString()}
-        <br />
-        {ev.venue}
-      </p>
-      <p className="mt-4 max-w-2xl text-sm leading-relaxed">{ev.description}</p>
-      <details className="mt-4 max-w-2xl text-xs text-muted">
-        <summary className="cursor-pointer">Event details</summary>
-        <p className="mt-2">Organized by {ev.organizerName ?? shortAddr(ev.organizerWallet)} · resale royalty {(ev.royaltyBps / 100).toFixed(1)}%</p>
-        <p className="mt-2 break-all font-mono">
-        {ev.vaultAddress ? (
-          <a
-            className="text-primary underline"
-            href={explorerAddress(ev.vaultAddress, explorer)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            vault {shortAddr(ev.vaultAddress)}
-          </a>
-        ) : null}
-        {ev.marketplaceAddress ? (
-          <>
-            {" · "}
-            <a
-              className="text-primary underline"
-              href={explorerAddress(ev.marketplaceAddress, explorer)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              marketplace {shortAddr(ev.marketplaceAddress)}
-            </a>
-          </>
-        ) : null}
-        {ev.collectionAddress ? (
-          <>
-            {" · "}
-            <a
-              className="text-primary underline"
-              href={explorerAddress(ev.collectionAddress, explorer)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              collection {shortAddr(ev.collectionAddress)}
-            </a>
-          </>
-        ) : null}
-        {ev.deployTx ? (
-          <>
-            {" · "}
-            <a
-              className="text-muted underline"
-              href={explorerTx(ev.deployTx, explorer)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              deploy tx
-            </a>
-          </>
-        ) : null}
-        </p>
-      </details>
+
+      {/* EVENT SHOWCASE HERO BANNER */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-bg-elevated shadow-sm">
+        <div className="relative h-64 sm:h-80 md:h-96 w-full overflow-hidden bg-mist">
+          {ev.posterUrl ? (
+            <img src={ev.posterUrl} alt={ev.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="grid h-full place-items-center text-muted">
+              <Ticket className="size-16 stroke-[1.2] opacity-40 mb-2" />
+              <span className="font-mono text-sm">No Poster Artwork Uploaded</span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/40 to-transparent" />
+
+          {/* OVERLAY METADATA */}
+          <div className="absolute bottom-6 left-6 right-6 text-paper">
+            <span className="inline-block rounded bg-primary px-2.5 py-0.5 font-mono text-xs font-semibold text-primary-fg shadow-xs">
+              {ev.category || "Live Event"}
+            </span>
+            <h1 className="mt-2 font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
+              {ev.name}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-mono text-paper/85">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="size-4 text-sage" />
+                <span>{startDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span>
+              </div>
+              <span>•</span>
+              <div className="flex items-center gap-1.5">
+                <Clock className="size-4 text-sage" />
+                <span>{startDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} – {endDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+              </div>
+              <span>•</span>
+              <div className="flex items-center gap-1.5">
+                <MapPin className="size-4 text-sage" />
+                <span>{ev.venue}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* DETAILS STRIP */}
+        <div className="grid border-t border-border bg-mist/20 p-5 md:grid-cols-[1fr_auto] gap-4 items-center">
+          <div>
+            <p className="text-sm text-fg leading-relaxed max-w-2xl">{ev.description}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
+              <span className="font-semibold text-fg">
+                Organized by {ev.organizerName ?? shortAddr(ev.organizerWallet)}
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1 text-primary">
+                <ShieldCheck className="size-3.5" />
+                Resale Creator Royalty: {(ev.royaltyBps / 100).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          {/* BLOCKCHAIN AUDIT ACCORDION */}
+          <details className="rounded-xl border border-border bg-bg-elevated p-3 text-xs">
+            <summary className="cursor-pointer font-mono font-medium text-primary hover:underline">
+              On-Chain Contract Contracts
+            </summary>
+            <div className="mt-3 space-y-2 font-mono text-[11px] text-muted">
+              {ev.vaultAddress ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Vault:</span>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={explorerAddress(ev.vaultAddress, explorer)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {shortAddr(ev.vaultAddress)}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => copyText(ev.vaultAddress!, "Vault Address")}
+                      className="text-muted hover:text-fg"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {ev.marketplaceAddress ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Market:</span>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={explorerAddress(ev.marketplaceAddress, explorer)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {shortAddr(ev.marketplaceAddress)}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => copyText(ev.marketplaceAddress!, "Marketplace Address")}
+                      className="text-muted hover:text-fg"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {ev.collectionAddress ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span>ERC-721:</span>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={explorerAddress(ev.collectionAddress, explorer)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {shortAddr(ev.collectionAddress)}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => copyText(ev.collectionAddress!, "Collection Address")}
+                      className="text-muted hover:text-fg"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </details>
+        </div>
+      </div>
+
+      {/* SYSTEM WARNING NOTICES */}
       {stale ? (
-        <p className="mt-3 text-sm text-danger">
-          This event was minted on the old operator-signed contract. Ask the organizer to mint a new
-          event so your wallet can send buy() itself.
-        </p>
-      ) : null}
-      {ev.engineVersion >= 3 && !ev.collectionAddress ? (
-        <p className="mt-3 text-sm text-danger">
-          This show has no ERC-721 collection. Ask the organizer to mint a new event.
-        </p>
+        <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 p-4 text-xs text-danger flex items-center gap-2.5">
+          <ShieldAlert className="size-4 shrink-0" />
+          <span>This event was minted on an earlier contract version. Direct wallet purchase is disabled.</span>
+        </div>
       ) : null}
       {ev.frozen ? (
-        <p className="mt-3 text-sm text-danger">Trading is frozen by the platform admin.</p>
-      ) : null}
-      <ChainDialog {...chain} onClose={chain.close} successDetails={receipt ? (
-        <div className="mt-3 grid gap-1 text-xs text-muted">
-          {receipt.collection ? <a className="text-primary underline" href={explorerAddress(receipt.collection, explorer)} target="_blank" rel="noreferrer">Collection {shortAddr(receipt.collection)}</a> : null}
-          {receipt.collection ? <a className="text-primary underline" href={explorerToken(receipt.collection, receipt.tokenId, explorer)} target="_blank" rel="noreferrer">Token #{receipt.tokenId} in explorer</a> : null}
-          {receipt.tokenUri ? <a className="text-primary underline" href={gatewayUrl(receipt.tokenUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">Open ticket details</a> : null}
-          <span>Explorer images can take time to appear. Open the details to check the JSON and image.</span>
+        <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 p-4 text-xs text-danger flex items-center gap-2.5">
+          <Lock className="size-4 shrink-0" />
+          <span>Trading and primary issuance on this event are currently frozen by platform governance.</span>
         </div>
-      ) : null} />
+      ) : null}
 
-      <div className="mt-8 grid gap-4">
-        {ev.tiers.map((tier) => (
-          <Card key={tier.id} className="stub p-5 pl-8">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="font-display text-2xl italic">{tier.name}</h2>
-                <details className="mt-1 text-xs text-muted"><summary className="cursor-pointer">Ticket details</summary><span className="mt-1 block break-all font-mono">{tier.contractAddress}</span></details>
-            <p className="mt-2 text-sm text-muted">{tier.available} available · {formatAmount(tier.faceCents, symbol)}</p>
-                <p className="mt-1 font-mono text-sm tabular-nums">
-                  {tier.minCents != null && tier.maxCents != null
-                    ? tier.minCents === tier.maxCents
-                      ? `Pool ${formatAmount(tier.minCents, symbol)}`
-                      : `Pool ${formatAmount(tier.minCents, symbol)} – ${formatAmount(tier.maxCents, symbol)}`
-                    : "No live listings"}
-                </p>
-              </div>
-              <Button
-                disabled={busy !== null || !tier.available || closed || stale || ev.frozen}
-                onClick={() => void buy(tier.id)}
+      {/* TICKET PASSES SELECTION SECTION */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-2xl font-bold tracking-tight text-fg">
+            Admission Passes
+          </h2>
+          <span className="font-mono text-xs text-muted">
+            {ev.tiers.length} Tier{ev.tiers.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {/* TICKET TIERS GRID */}
+        <div className="grid gap-4">
+          {ev.tiers.map((tier) => {
+            const isSoldOut = tier.available <= 0;
+            const isLocked = busy !== null || isSoldOut || closed || stale || ev.frozen;
+
+            return (
+              <div
+                key={tier.id}
+                className="ticket-pass group grid overflow-hidden rounded-xl border border-border bg-bg-elevated transition-all md:grid-cols-[1fr_220px]"
               >
-                {busy === tier.id ? "Sending…" : "Buy now"}
-              </Button>
-            </div>
-          </Card>
-        ))}
+                {/* TIER INFORMATION */}
+                <div className="p-6 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-2xl font-bold italic tracking-tight text-fg">
+                        {tier.name}
+                      </h3>
+                      {tier.available > 0 && tier.available <= 10 ? (
+                        <Badge tone="danger" className="text-[10px] font-mono">
+                          Only {tier.available} Left
+                        </Badge>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 text-xs font-mono">
+                      {tier.available > 0 ? (
+                        <span className="text-success font-semibold">{tier.available} remaining</span>
+                      ) : (
+                        <span className="text-danger font-semibold">Sold Out</span>
+                      )}
+                      {tier.minCents != null ? (
+                        <>
+                          <span className="text-muted">•</span>
+                          <span className="text-muted">
+                            Resale: {formatAmount(tier.minCents, symbol)}
+                            {tier.maxCents != null && tier.maxCents !== tier.minCents
+                              ? `–${formatAmount(tier.maxCents, symbol)}`
+                              : ""}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                {/* TEAR-OFF COUPON PURCHASE STUB */}
+                <div className="relative flex flex-col justify-between border-t md:border-t-0 md:border-l border-dashed border-border bg-mist/25 p-6 text-center md:text-right">
+                  {/* Decorative circular notch punches */}
+                  <div className="hidden md:block absolute -left-2.5 -top-2.5 size-5 rounded-full bg-bg border border-border" />
+                  <div className="hidden md:block absolute -left-2.5 -bottom-2.5 size-5 rounded-full bg-bg border border-border" />
+
+                  <div>
+                    <p className="font-mono text-2xl font-bold tabular-nums text-primary">
+                      {formatAmount(tier.faceCents, symbol)}
+                    </p>
+                  </div>
+
+                  <div className="mt-4">
+                    <Button
+                      variant={isSoldOut ? "outline" : "default"}
+                      size="default"
+                      className="w-full font-bold shadow-xs transition-transform active:scale-98"
+                      disabled={isLocked}
+                      onClick={() => void buy(tier.id)}
+                    >
+                      {busy === tier.id ? (
+                        <span className="flex items-center gap-2">
+                          <span className="size-3 rounded-full border-2 border-primary-fg border-t-transparent animate-spin" />
+                          Processing…
+                        </span>
+                      ) : isSoldOut ? (
+                        "Sold Out"
+                      ) : !me ? (
+                        "Connect to Buy"
+                      ) : !me.kyc || me.kyc.status !== "approved" ? (
+                        "KYC Required"
+                      ) : (
+                        "Buy Now →"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <p className="mt-4 text-xs text-muted">
-        KYC approval is required to buy. Need test coins? Claim them on the shows page.{" "}
-        <Link to="/kyc" className="underline">
-          Open KYC
-        </Link>
-      </p>
+
+      {/* THREE PROTOCOL PILLARS */}
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-bg-elevated/60 px-4 py-3 text-xs text-muted">
+          <ShieldCheck className="size-4 text-primary shrink-0" />
+          <span>1-Wallet-1-Ticket Enforced</span>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-bg-elevated/60 px-4 py-3 text-xs text-muted">
+          <Sparkles className="size-4 text-sage shrink-0" />
+          <span>90%~110% Resale Price Cap</span>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-bg-elevated/60 px-4 py-3 text-xs text-muted">
+          <QrCode className="size-4 text-primary shrink-0" />
+          <span>Dynamic Anti-Screenshot QR</span>
+        </div>
+      </div>
+
+      {/* CHAIN TRANSACTION PROGRESS MODAL */}
+      <ChainDialog
+        {...chain}
+        onClose={chain.close}
+        successDetails={
+          receipt ? (
+            <div className="mt-4 rounded-xl border border-success/30 bg-success/10 p-4 text-xs text-fg">
+              <div className="flex items-center gap-2 text-success font-bold mb-2">
+                <CheckCircle2 className="size-4" />
+                <span>Ticket Minted and Vaulted Successfully!</span>
+              </div>
+              <div className="space-y-1 font-mono text-[11px] text-muted">
+                {receipt.collection ? (
+                  <div className="flex justify-between">
+                    <span>ERC-721 Collection:</span>
+                    <a
+                      className="text-primary underline"
+                      href={explorerAddress(receipt.collection, explorer)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {shortAddr(receipt.collection)}
+                    </a>
+                  </div>
+                ) : null}
+                <div className="flex justify-between">
+                  <span>Token Pass ID:</span>
+                  <a
+                    className="text-primary underline"
+                    href={explorerToken(receipt.collection ?? "", receipt.tokenId, explorer)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    #{receipt.tokenId}
+                  </a>
+                </div>
+                {receipt.tokenUri ? (
+                  <div className="flex justify-between">
+                    <span>Decentralized Metadata:</span>
+                    <a
+                      className="text-primary underline"
+                      href={gatewayUrl(receipt.tokenUri, config?.ipfsGateway)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      IPFS Gateway ↗
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null
+        }
+      />
     </AppShell>
   );
 }

@@ -128,31 +128,28 @@ function AdminDashboard() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted">Platform</p>
-          <h1 className="font-display text-4xl italic">Dashboard</h1>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
+          Admin Console
+        </h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void navigate({ to: "/admin/kyc" })}>
+          <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin/kyc" })}>
             KYC
           </Button>
-          <Button variant="outline" onClick={() => void navigate({ to: "/admin/organizers" })}>
+          <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin/organizers" })}>
             Organizers
           </Button>
-          <Button onClick={() => void navigate({ to: "/admin/config" })}>Configuration</Button>
+          <Button size="sm" onClick={() => void navigate({ to: "/admin/config" })}>
+            Settings
+          </Button>
         </div>
       </div>
 
       {incomplete ? (
-        <Card className="mt-6 p-5">
-          <p className="text-sm">
-            First-run setup is incomplete. Order: Database → Pinata → Signer key. Optional: Dev mode
-            (DxDAI). The bootstrap file is only the public admin address and RPC — secrets stay in the
-            database.
-          </p>
-          <Button className="mt-3" onClick={() => void navigate({ to: "/admin/config" })}>
-            Open setup
+        <Card className="mt-5 p-4 flex flex-wrap items-center justify-between gap-3 border-primary/40 bg-primary/5">
+          <p className="text-sm font-medium text-fg">Platform setup incomplete (Database, Storage, or Signer key required).</p>
+          <Button size="sm" onClick={() => void navigate({ to: "/admin/config" })}>
+            Configure
           </Button>
         </Card>
       ) : null}
@@ -161,24 +158,18 @@ function AdminDashboard() {
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Signer</p>
           <p className="mt-2 font-mono text-sm">
-            {infra?.chain.operatorAddress ? shortAddr(infra.chain.operatorAddress) : "not set"}
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            {infra?.chain.lastAnchor
-              ? `${infra.chain.lastAnchor.kind} · ${infra.chain.lastAnchor.hash.slice(0, 10)}…`
-              : "no recent operator tx"}
+            {infra?.chain.operatorAddress ? shortAddr(infra.chain.operatorAddress) : "Not set"}
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Pending payouts</p>
+          <p className="text-xs uppercase tracking-wide text-muted">Pending Payouts</p>
           <p className="mt-2 font-mono text-2xl tabular-nums">
             {payouts.filter((p) => p.status === "pending" || p.status === "escalated").length}
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Chain index</p>
+          <p className="text-xs uppercase tracking-wide text-muted">Chain Index</p>
           <p className="mt-2 font-mono text-2xl tabular-nums">{pending.length}</p>
-          <p className="mt-1 text-xs text-muted">chain ok, index lagged</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Events</p>
@@ -188,12 +179,7 @@ function AdminDashboard() {
 
       <ChainDialog {...chain} onClose={chain.close} />
 
-      <h2 className="mt-10 font-display text-2xl italic">Chain index</h2>
-      <p className="mt-1 text-sm text-muted">
-        Chain is the source of truth. Rows here are receipts that landed on Chiado but failed to
-        update the index. Retry replays the same verify + index path. Dismiss marks it resolved
-        without changing tickets.
-      </p>
+      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Chain Index</h2>
       <div className="mt-3 divide-y divide-border rounded-xl border border-border">
         {pending.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted">No pending index rows.</p>
@@ -264,10 +250,7 @@ function AdminDashboard() {
         ))}
       </div>
 
-      <h2 className="mt-10 font-display text-2xl italic">Withdraw requests</h2>
-      <p className="mt-1 text-sm text-muted">
-        Legacy requests keep their original rules. Version 4 events open a seven-day opposition window; requests with at least one third opposed can be escalated here with materials.
-      </p>
+      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Withdraw Requests</h2>
       <div className="mt-3 divide-y divide-border rounded-xl border border-border">
         {payouts.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted">No requests yet.</p>
@@ -338,12 +321,8 @@ function AdminDashboard() {
         ))}
       </div>
 
-      <h2 className="mt-10 font-display text-2xl italic">All events <Hint>Freezing pauses buying, resale, transfers and withdrawals. Check-in stays available.</Hint></h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted">
-        Freeze locks the marketplace, the vault, and the ERC-721 collection (no buy, list, transfer,
-        or withdraw). Check-in can still run. Shows minted before the collection must be reminted.
-      </p>
-      <div className="mt-4 grid gap-3">
+      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Events</h2>
+      <div className="mt-3 grid gap-3">
         {events.length === 0 ? (
           <Card className="p-5 text-sm text-muted">No events yet.</Card>
         ) : null}
@@ -365,7 +344,7 @@ function AdminDashboard() {
                   {ev.withdrawRequest === "escalated" ? <Badge tone="danger">Escalated</Badge> : null}
                   <Badge>{checkInPct(ev.checkInRate)} checked in</Badge>
                 </div>
-                <h3 className="mt-1 font-display text-xl italic">{ev.name}</h3>
+                <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-fg">{ev.name}</h3>
                 <p className="text-sm text-muted">
                   {ev.venue} · sold {ev.sold}/{ev.supply} · gate {ev.checkedIn} · vault{" "}
                   {formatAmount(ev.lockedCents, symbol)}
@@ -425,11 +404,7 @@ function AdminDashboard() {
         ))}
       </div>
 
-      <h2 className="mt-10 font-display text-2xl italic">Signer operations</h2>
-      <p className="mt-1 text-sm text-muted">
-        On-chain work the operator key has indexed: deploys, mints, check-ins, refunds, freezes,
-        withdrawals. Click through to the explorer.
-      </p>
+      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Signer Operations</h2>
       <div className="mt-3 divide-y divide-border rounded-xl border border-border">
         {ops.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted">No indexed operations yet.</p>

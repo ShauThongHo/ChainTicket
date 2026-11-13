@@ -92,8 +92,7 @@ export function describeDatabaseUrl(url: string | undefined) {
   if (!url) return { host: "embedded PGLite", masked: "pglite://memory" };
   try {
     const u = new URL(url);
-    if (u.password) u.password = "••••";
-    return { host: u.host, masked: u.toString() };
+    return { host: u.host, masked: "postgres://••••" };
   } catch {
     return { host: "configured", masked: "postgres://••••" };
   }

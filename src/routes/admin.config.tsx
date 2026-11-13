@@ -64,15 +64,17 @@ function AdminConfig() {
   async function load() {
     const data = await fetchInfra();
     setInfra(data);
-    setBps(String(data.royaltyBps / 100));
-    setRpcUrl(data.chain.rpcUrl);
-    setChainId(String(data.chain.chainId));
-    setExplorerUrl(data.chain.explorerUrl);
-    setChainName(data.chain.chainName);
-    setNativeSymbol(data.chain.nativeSymbol);
-    setAdminWallet(data.adminWallet);
-    setKycAuto(data.kyc.autoApprove);
-    setIpfsGateway(data.chain.ipfsGateway);
+    setBps(String((data?.royaltyBps ?? 0) / 100));
+    if (data?.chain) {
+      setRpcUrl(data.chain.rpcUrl ?? "");
+      setChainId(String(data.chain.chainId ?? ""));
+      setExplorerUrl(data.chain.explorerUrl ?? "");
+      setChainName(data.chain.chainName ?? "");
+      setNativeSymbol(data.chain.nativeSymbol ?? "");
+      setIpfsGateway(data.chain.ipfsGateway ?? "");
+    }
+    setAdminWallet(data?.adminWallet ?? "");
+    setKycAuto(data?.kyc?.autoApprove ?? false);
   }
 
   useEffect(() => {
@@ -93,66 +95,42 @@ function AdminConfig() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted">Platform</p>
-          <h1 className="font-display text-4xl italic">Configuration</h1>
-        </div>
-        <Button variant="outline" onClick={() => void navigate({ to: "/admin" })}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
+          System Configuration
+        </h1>
+        <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin" })}>
           Dashboard
         </Button>
       </div>
 
       <Card className="mt-6 p-5">
-        <div className="flex items-center gap-2"><h2 className="font-display text-2xl italic">Setup status</h2><Hint>Connect database, metadata storage, and signer. Protect the database because it stores the operator key. The public platform file contains only network and admin bootstrap settings.</Hint></div>
-        <p className="mt-1 text-sm text-muted">
-          Order: Database → Pinata → Signer → optional Dev mode. Secrets stay in the connected
-          database only. <span className="font-mono">config/platform.json</span> is public bootstrap:
-          admin wallet, RPC, chain id, explorer. Anyone who can read that database can read the hot
-          operator key — lock the database network down in production.
-        </p>
-        <ol className="mt-4 grid gap-2 text-sm">
-          <li className={step === 1 ? "text-fg" : setup?.database ? "text-success" : "text-muted"}>
-            1. Database {setup?.database ? "· ready" : "· paste a Postgres URL"} — secrets live here
-            after connect
-          </li>
-          <li className={step === 2 ? "text-fg" : setup?.pinata ? "text-success" : "text-muted"}>
-            2. Pinata {setup?.pinata ? "· ready" : "· save a JWT for posters"}
-          </li>
-          <li className={step === 3 ? "text-fg" : setup?.signer ? "text-success" : "text-muted"}>
-            3. Signer key {setup?.signer ? "· ready" : "· generate or paste"} — operator private key,
-            database only
-          </li>
-          <li className="text-muted">4. Optional — Dev mode deploys a fresh DxDAI bank on Chiado</li>
-        </ol>
-        <ul className="mt-4 grid gap-1 text-xs text-muted">
-          <li>Operator key, Pinata JWT and DATABASE_URL are rows in the database, never sent back in full.</li>
-          <li>
-            KYC keys (KYC_AES_KEY, KYC_HMAC_PEPPER) and DATABASE_URL_KYC stay on the server. If the
-            key env vars are empty, one pair is generated into the database and never shown again.
-          </li>
-          <li>A gitignored local pointer stores only the database URL so preview can reconnect. It does not store keys.</li>
-          <li>Generating a new signer replaces the old key. The new key is not shown again.</li>
-        </ul>
+        <h2 className="font-display text-xl font-bold tracking-tight text-fg">Setup Status</h2>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-border bg-bg-elevated/60 p-3 flex items-center justify-between">
+            <span className="text-xs font-semibold">1. Database</span>
+            <Badge tone={setup?.database ? "sage" : "mist"}>{setup?.database ? "Connected" : "Required"}</Badge>
+          </div>
+          <div className="rounded-lg border border-border bg-bg-elevated/60 p-3 flex items-center justify-between">
+            <span className="text-xs font-semibold">2. IPFS Storage</span>
+            <Badge tone={setup?.pinata ? "sage" : "mist"}>{setup?.pinata ? "Connected" : "Required"}</Badge>
+          </div>
+          <div className="rounded-lg border border-border bg-bg-elevated/60 p-3 flex items-center justify-between">
+            <span className="text-xs font-semibold">3. Signer Key</span>
+            <Badge tone={setup?.signer ? "sage" : "mist"}>{setup?.signer ? "Ready" : "Required"}</Badge>
+          </div>
+        </div>
       </Card>
 
-      <Card className="mt-6 p-5">
-        <h2 className="font-display text-2xl italic">KYC private database</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Public tables store only a random reference and status. Name, ID number and nationality are
-          AES-256-GCM ciphertext. Set <span className="font-mono">DATABASE_URL_KYC</span> to a second
-          Neon project, or paste it here (stored in the business database, not in a file). Leave it
-          empty and ciphertext stays in this database’s <span className="font-mono">kyc_private</span>{" "}
-          table. Anyone who can read the database that holds the AES key can decrypt — restrict that
-          network in production.
-        </p>
-        {infra ? (
-          <p className="mt-3 font-mono text-xs text-muted">
-            Store {infra.kyc.privateSource} · {infra.kyc.privateHost} · keys {infra.kyc.keySource}
-            {infra.kyc.autoApprove ? " · auto-approve" : " · admin review"}
-          </p>
-        ) : null}
-        <p className="mt-2 text-xs text-muted">KYC_AUTO_APPROVE set in the server environment overrides this saved setting.</p>
+      <Card className="mt-4 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold tracking-tight text-fg">KYC Isolated Database</h2>
+          {infra?.kyc ? (
+            <span className="font-mono text-xs text-muted">
+              {infra.kyc.privateSource} · {infra.kyc.privateHost}
+            </span>
+          ) : null}
+        </div>
         <div className="mt-4 grid gap-3">
           <div className="grid gap-1.5">
             <Label htmlFor="kyc-url">DATABASE_URL_KYC</Label>
@@ -161,9 +139,9 @@ function AdminConfig() {
               type="password"
               autoComplete="off"
               placeholder={
-                infra?.kyc.privateSource === "shared"
-                  ? "Optional second Postgres URL"
-                  : `Saved on ${infra?.kyc.privateHost ?? "server"} · paste to replace`
+                infra?.kyc?.privateSource === "shared"
+                  ? "postgres://user:pass@host/db"
+                  : "postgres://••••"
               }
               value={kycUrl}
               onChange={(e) => setKycUrl(e.target.value)}
@@ -178,7 +156,7 @@ function AdminConfig() {
             <Button
               disabled={busy}
               onClick={() => {
-                if (mainnet && kycAuto && !infra?.kyc.autoApprove && !window.confirm("Enable automatic KYC approval on Gnosis mainnet? New valid submissions will be approved without an administrator reviewing the identity documents.")) return;
+                if (mainnet && kycAuto && !infra?.kyc?.autoApprove && !window.confirm("Enable automatic KYC approval on Gnosis mainnet? New valid submissions will be approved without an administrator reviewing the identity documents.")) return;
                 void withBusy(setBusy, async () => {
                   const saved = await saveInfra({
                       data: {
@@ -197,7 +175,7 @@ function AdminConfig() {
             </Button>
             <Button
               variant="outline"
-              disabled={busy || infra?.kyc.privateSource === "env"}
+              disabled={busy || infra?.kyc?.privateSource === "env"}
               onClick={() =>
                 void withBusy(setBusy, async () => {
                   const saved = await saveInfra({ data: { clearDatabaseUrlKyc: true, kycAutoApprove: kycAuto } });
@@ -211,20 +189,16 @@ function AdminConfig() {
               Clear saved URL
             </Button>
           </div>
-          {infra?.kyc.privateSource === "env" ? (
+          {infra?.kyc?.privateSource === "env" ? (
             <p className="text-xs text-muted">DATABASE_URL_KYC is set in the server environment and wins over the saved URL.</p>
           ) : null}
         </div>
       </Card>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <h2 className="font-display text-2xl italic">Database</h2>
-          <p className="mt-1 text-sm text-muted">
-            Index of events and contract addresses. Preview uses embedded Postgres until you paste a
-            Neon URL. Money is on-chain.
-          </p>
-          {infra?.db.error ? <p className="mt-2 text-sm text-danger">{infra.db.error}</p> : null}
+          <h2 className="font-display text-xl font-bold tracking-tight text-fg">Database</h2>
+          {infra?.db?.error ? <p className="mt-2 text-sm text-danger">{infra.db.error}</p> : null}
           <div className="mt-4 grid gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="db-url">DATABASE_URL</Label>
@@ -232,7 +206,7 @@ function AdminConfig() {
                 id="db-url"
                 type="password"
                 autoComplete="off"
-                placeholder={infra?.db.masked || "postgres://user:pass@host/db"}
+                placeholder={infra?.db?.masked || "postgres://user:pass@host/db"}
                 value={databaseUrl}
                 onChange={(e) => setDatabaseUrl(e.target.value)}
               />
@@ -276,17 +250,14 @@ function AdminConfig() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-display text-2xl italic">Pinata</h2>
-          <p className="mt-1 text-sm text-muted">JWT is stored in the database. New ticket metadata stores content-addressed ipfs:// URIs; this gateway is used only to read and preview content.</p>
+          <h2 className="font-display text-xl font-bold tracking-tight text-fg">IPFS & Pinata</h2>
           <div className="mt-4 grid gap-3">
             <div className="grid gap-1.5">
               <Label>Pinata JWT</Label>
               <Input
                 type="password"
                 autoComplete="off"
-                placeholder={
-                  infra?.chain.pinataMask ? `Saved ${infra.chain.pinataMask} · paste to replace` : "eyJ…"
-                }
+                placeholder={infra?.chain?.pinataMask ? "eyJ••••" : "eyJ…"}
                 value={pinataJwt}
                 onChange={(e) => setPinataJwt(e.target.value)}
               />
@@ -313,7 +284,6 @@ function AdminConfig() {
                 value={ipfsGateway}
                 onChange={(e) => setIpfsGateway(e.target.value)}
               />
-              <p className="text-xs text-muted">Use a public HTTPS gateway with anonymous read access. The app uses it to resolve ipfs:// links; the blockchain URI stays ipfs://CID for explorer compatibility.</p>
             </div>
             <Button
               variant="outline"
@@ -332,13 +302,13 @@ function AdminConfig() {
       </div>
 
       <Card className="mt-4 border-danger/40 p-5">
-        <h2 className="font-display text-2xl italic">Reset application data</h2>
-        <p className="mt-1 max-w-3xl text-sm text-muted">
-          Permanently removes app records, organizers, listings, balances, KYC records and stored KYC photos from this installation, including the separate KYC database if configured. Admin access, network settings, signer configuration and other setup values are preserved. This does not undo blockchain transactions or remove deployed contracts, tickets, or funds on-chain.
+        <h2 className="font-display text-xl font-bold tracking-tight text-danger">Reset Application Data</h2>
+        <p className="mt-1 text-xs text-muted">
+          Permanently deletes app records, listings, and KYC data. On-chain contracts and balances remain untouched.
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <div className="grid min-w-64 flex-1 gap-1.5">
-            <Label htmlFor="reset-phrase">Type RESET APPLICATION DATA to enable</Label>
+            <Label htmlFor="reset-phrase">Type RESET APPLICATION DATA to confirm</Label>
             <Input id="reset-phrase" value={resetPhrase} onChange={(e) => setResetPhrase(e.target.value)} autoComplete="off" />
           </div>
           <Button
@@ -361,14 +331,13 @@ function AdminConfig() {
       </Card>
 
       <Card className="mt-4 p-5">
-        <h2 className="font-display text-2xl italic">Network & signer</h2>
-        <p className="mt-1 text-sm text-muted">Active network: <strong>{infra?.chain.chainName || chainName}</strong> · chain ID {infra?.chain.chainId ?? chainId}. Each network needs its own deployment and database.</p>
-        {mainnet ? <p className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">Gnosis mainnet is selected. Dev mode will deploy a DxDAI contract on the live network and use that token in app flows. It is not an isolated test environment.</p> : null}
-        <p className="mt-1 text-sm text-muted">
-          RPC and admin address are public. The operator private key is written only to the
-          database after it is connected.
-        </p>
-        {infra?.chain.error || infra?.chain.lastError ? <p className="mt-2 text-sm text-danger">{infra?.chain.error || infra?.chain.lastError}</p> : null}
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold tracking-tight text-fg">Network & Signer</h2>
+          <span className="font-mono text-xs text-muted">
+            {infra?.chain?.chainName || chainName} (ID {infra?.chain?.chainId ?? chainId})
+          </span>
+        </div>
+        {infra?.chain?.error || infra?.chain?.lastError ? <p className="mt-2 text-sm text-danger">{infra?.chain?.error || infra?.chain?.lastError}</p> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="grid gap-1.5 md:col-span-2">
             <Label htmlFor="network-preset">Network preset</Label>
@@ -407,17 +376,13 @@ function AdminConfig() {
             <Input
               type="password"
               autoComplete="off"
-              placeholder={
-                infra?.chain.operatorMask
-                  ? `Saved ${infra.chain.operatorMask} · paste to replace`
-                  : "0x…"
-              }
+              placeholder={infra?.chain?.operatorMask ? "0x••••" : "0x…"}
               value={operatorPk}
               onChange={(e) => setOperatorPk(e.target.value)}
             />
           </div>
         </div>
-        {infra?.chain.operatorAddress ? (
+        {infra?.chain?.operatorAddress ? (
           <p className="mt-2 font-mono text-xs text-muted">
             Signer {shortAddr(infra.chain.operatorAddress)} ·{" "}
             {infra.chain.operatorBalance
@@ -470,7 +435,7 @@ function AdminConfig() {
             onClick={() =>
               void withBusy(setBusy, async () => {
                 if (
-                  infra?.chain.operatorKeySet &&
+                  infra?.chain?.operatorKeySet &&
                   !window.confirm(
                     "Replace the operator key? The previous key stops signing immediately. The new key is stored in the database and will not be shown.",
                   )
@@ -497,16 +462,13 @@ function AdminConfig() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <h2 className="font-display text-2xl italic">Dev mode</h2>
-          <p className="mt-1 text-sm text-muted">
-            On: deploys a fresh DxDAI bank (10,000). Off: native xDAI. Toggle off then on to recast.
-          </p>
+          <h2 className="font-display text-xl font-bold tracking-tight text-fg">Testnet Faucet</h2>
           <ChainDialog {...chain} onClose={chain.close} />
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Badge tone={infra?.chain.devMode ? "sage" : "mist"}>
-              {infra?.chain.devMode ? "dev on" : "native coin"}
+            <Badge tone={infra?.chain?.devMode ? "sage" : "mist"}>
+              {infra?.chain?.devMode ? "Dev Active" : "Native xDAI"}
             </Badge>
-            {infra?.chain.demoBank ? (
+            {infra?.chain?.demoBank ? (
               <a
                 className="font-mono text-xs text-primary underline"
                 href={explorerAddress(infra.chain.demoBank, infra.chain.explorerUrl)}
@@ -519,10 +481,10 @@ function AdminConfig() {
           </div>
           <Button
             className="mt-4"
-            disabled={busy || !infra?.setup.signer}
+            disabled={busy || !infra?.setup?.signer}
             onClick={() =>
               void withBusy(setBusy, async () => {
-                const enabling = !infra?.chain.devMode;
+                const enabling = !infra?.chain?.devMode;
                 if (enabling && mainnet && !window.confirm("Deploy a DxDAI contract on live Gnosis mainnet and switch app payment flows to that token? This sends a real mainnet transaction.")) return;
                 await chain.run({
                   title: enabling ? "Turn on test coins" : "Turn off test coins",
@@ -534,19 +496,18 @@ function AdminConfig() {
                     const next = await setDevMode({ data: { on: enabling } });
                     advance(2);
                     setInfra(next);
-                    return next.chain.devMode ? "A fresh 10,000 DxDAI bank is ready." : "The platform now uses native xDAI.";
+                    return next?.chain?.devMode ? "A fresh 10,000 DxDAI bank is ready." : "The platform now uses native xDAI.";
                   },
                 });
               })
             }
           >
-            {infra?.chain.devMode ? "Turn off · use native xDAI" : "Mint 10,000 DxDAI"}
+            {infra?.chain?.devMode ? "Use native xDAI" : "Mint 10,000 DxDAI"}
           </Button>
         </Card>
 
-          <Card className="p-5">
-          <Label>Secondary royalty (%)</Label>
-          <p className="mt-1 text-xs text-muted">Taken from the seller on every resale, into that event’s vault.</p>
+        <Card className="p-5">
+          <Label className="text-sm font-semibold">Resale Royalty (%)</Label>
           <div className="mt-3 flex gap-2">
             <Input value={bps} onChange={(e) => setBps(e.target.value)} />
             <Button

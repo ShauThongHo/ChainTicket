@@ -10,9 +10,12 @@ import { getAddress } from "viem";
 
 function Brand() {
   return (
-    <Link to="/marketplace" className="flex items-center gap-2 text-fg">
-      <span className="stub-mark" aria-hidden />
-      <span className="font-display text-xl">ChainTicket</span>
+    <Link to="/marketplace" className="group flex items-center gap-2.5 text-fg transition-opacity hover:opacity-90">
+      <span className="stub-mark transition-transform group-hover:scale-105" aria-hidden />
+      <div className="flex flex-col">
+        <span className="font-display text-xl font-bold tracking-tight">ChainTicket</span>
+        <span className="text-[10px] font-mono leading-none text-muted">Vaulted Web3 Passes</span>
+      </div>
     </Link>
   );
 }
@@ -104,7 +107,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={l.to}
                     to={l.to}
-                    className={`border-b-2 px-3 py-2 text-sm ${active ? "border-primary text-fg" : "border-transparent text-muted hover:text-fg"}`}
+                    className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      active ? "bg-mist font-semibold text-primary shadow-xs" : "text-muted hover:bg-mist/50 hover:text-fg"
+                    }`}
                   >
                     {l.label}
                   </Link>
@@ -113,16 +118,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
             <div className="flex items-center gap-2">
               {me ? (
-                <div className="hidden items-center gap-2 px-2 py-2 font-mono text-xs md:flex">
-                  <Wallet className="size-3.5" />
-                  <span>{shortAddr(getAddress(me.address))}</span>
-                  <span className="text-muted">{me.role}</span>
-                  <button type="button" className="text-muted hover:text-fg" onClick={() => void signOut()}>
+                <div className="hidden items-center gap-2.5 rounded-lg border border-border bg-bg-elevated px-2.5 py-1.5 font-mono text-xs md:flex">
+                  <div className="flex items-center gap-1.5 text-primary">
+                    <Wallet className="size-3.5" />
+                    <span className="font-semibold">{formatAmount(me.spendableCents, symbol)}</span>
+                  </div>
+                  <span className="text-border">|</span>
+                  <span className="text-fg">{shortAddr(getAddress(me.address))}</span>
+                  {me.role !== "buyer" ? (
+                    <span className="rounded bg-mist px-1.5 py-0.5 text-[10px] uppercase font-semibold text-primary">
+                      {me.role}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ml-1 text-muted transition-colors hover:text-danger"
+                    onClick={() => void signOut()}
+                  >
                     Sign out
                   </button>
                 </div>
               ) : (
-                <Button size="sm" onClick={requestConnect}>
+                <Button size="sm" onClick={requestConnect} className="shadow-xs">
                   Connect wallet
                 </Button>
               )}

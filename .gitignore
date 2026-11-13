@@ -15,16 +15,33 @@ coverage/
 
 # Local data and secrets
 .data/
+.data/*
 .env
 .env.*
 !.env.example
 *.pem
+*.key
+*.pfx
+*.p12
 operator-secrets.json
 config/platform.json
 config/*secrets*
 config/*private*
 config/*credentials*
 infra.json
+secrets/
+*.sqlite
+*.db
+*.db-journal
+*.db-wal
+
+# AI Agents & Automation tools
+.agents/
+.agents
+AGENTS.md
+AGENTS.*.md
+.grok/
+.grok
 
 # Logs and temporary files
 *.log
@@ -37,11 +54,17 @@ pnpm-debug.log*
 *.old
 *.orig
 .node_modules.lock
-.grok
-screenshots
-artifacts
-AGENTS.md
-attachments
+screenshots/
+artifacts/
+attachments/
+
+# Python scripts cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
 
 # OS and editor files
 .DS_Store

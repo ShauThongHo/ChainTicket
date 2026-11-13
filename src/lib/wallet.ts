@@ -79,16 +79,18 @@ function currentProvider(): EIP1193Provider | null {
 }
 
 function chainOf(net: PublicConfig) {
+  const chainId = net?.chainId ?? 10200;
   return defineChain({
-    id: net.chainId,
-    name: net.chainName || "Ticket network",
-    nativeCurrency: { name: net.nativeSymbol, symbol: net.nativeSymbol, decimals: 18 },
-    rpcUrls: { default: { http: [net.rpcUrl] } },
-    blockExplorers: { default: { name: "Explorer", url: net.explorerUrl } },
+    id: chainId,
+    name: net?.chainName || "Ticket network",
+    nativeCurrency: { name: net?.nativeSymbol || "XDAI", symbol: net?.nativeSymbol || "XDAI", decimals: 18 },
+    rpcUrls: { default: { http: [net?.rpcUrl || "https://rpc.chiadochain.net"] } },
+    blockExplorers: { default: { name: "Explorer", url: net?.explorerUrl || "https://gnosis-chiado.blockscout.com" } },
   });
 }
 
 export async function switchNetwork(provider: EIP1193Provider, net: PublicConfig) {
+  if (!net?.chainId) return;
   const chainId = toChainHex(net.chainId);
   try {
     await provider.request({
@@ -118,14 +120,16 @@ export async function switchNetwork(provider: EIP1193Provider, net: PublicConfig
 
 export async function connectInjected(provider: EIP1193Provider, net: PublicConfig) {
   rememberInjected(provider);
-  await switchNetwork(provider, net).catch(() => undefined);
+  if (net?.chainId) {
+    await switchNetwork(provider, net).catch(() => undefined);
+  }
   const client = createWalletClient({
     transport: custom(provider),
   });
   const addresses = await client.requestAddresses();
   const address = addresses[0];
   if (!address) throw new Error("No account returned.");
-  return { client, address, chainId: net.chainId };
+  return { client, address, chainId: net?.chainId ?? 10200 };
 }
 
 export function getPreviewAccount() {
@@ -147,15 +151,19 @@ export async function sendUserCall(
     const chain = chainOf(net);
     const publicClient = createPublicClient({
       chain,
-      transport: http(net.rpcUrl, { timeout: 40_000 }),
+      transport: http(net?.rpcUrl || "https://rpc.chiadochain.net", { timeout: 40_000 }),
     });
-    assertChainIdMatches(net.chainId, await publicClient.getChainId());
+    if (net?.chainId) {
+      assertChainIdMatches(net.chainId, await publicClient.getChainId());
+    }
     const provider = currentProvider();
     const mode = typeof window !== "undefined" ? localStorage.getItem(MODE_KEY) : null;
     let hash: Hex;
     if (mode === "injected" && provider) {
       const wallet = createWalletClient({ chain, transport: custom(provider) });
-      assertChainIdMatches(net.chainId, await wallet.getChainId());
+      if (net?.chainId) {
+        assertChainIdMatches(net.chainId, await wallet.getChainId());
+      }
       const [account] = await wallet.getAddresses();
       if (!account) throw new Error("Connect a wallet first.");
       hash = await wallet.writeContract({

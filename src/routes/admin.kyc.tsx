@@ -96,19 +96,14 @@ function AdminKyc() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted">Platform</p>
-          <h1 className="font-display text-4xl italic">KYC review</h1>
-        </div>
-        <Button variant="outline" onClick={() => void navigate({ to: "/admin" })}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
+          KYC Submissions
+        </h1>
+        <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin" })}>
           Dashboard
         </Button>
       </div>
-      <p className="mt-2 max-w-2xl text-sm text-muted">
-        The list is the public index only: wallet, reference, status. Identity is decrypted when you
-        open a row, and that view is written to the audit log. Do not use real documents in this demo.
-      </p>
 
       <Card className="mt-6 p-5">
         <form

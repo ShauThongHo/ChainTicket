@@ -35,6 +35,20 @@ type SessionCtx = {
 
 const Ctx = createContext<SessionCtx | null>(null);
 
+const DEFAULT_CONFIG: PublicConfig = {
+  chainId: 10200,
+  chainName: "Gnosis Chiado",
+  nativeSymbol: "XDAI",
+  rpcUrl: "https://rpc.chiadochain.net",
+  explorerUrl: "https://gnosis-chiado.blockscout.com",
+  ipfsGateway: "https://dweb.link",
+  adminConfigured: false,
+  devMode: false,
+  demoBank: null,
+  pinataReady: false,
+  setupComplete: false,
+};
+
 export function portalFor(user: SessionMe): "/admin" | "/organizer" | "/marketplace" {
   if (user.role === "admin") return "/admin";
   if (user.role === "organizer") return "/organizer";
@@ -73,8 +87,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setWallets(discoverWallets());
     restoreWallet();
     void fetchPublicConfig()
-      .then(setConfig)
-      .catch(() => undefined);
+      .then((cfg) => setConfig(cfg ?? DEFAULT_CONFIG))
+      .catch(() => setConfig(DEFAULT_CONFIG));
     void refresh();
   }, [refresh]);
 
@@ -112,7 +126,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (provider: EIP1193Provider) => {
       activeProvider.current = provider;
       setProviderVersion((version) => version + 1);
-      const net = config ?? (await fetchPublicConfig());
+      const net = config ?? (await fetchPublicConfig().catch(() => null)) ?? DEFAULT_CONFIG;
       setConfig(net);
       const { client, address } = await connectInjected(provider, net);
       const user = await loginWithSigner(
@@ -171,7 +185,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const sendUserCall = useCallback(
     async (call: UserCall, hooks?: { onSubmitted?: (hash: Hex) => void }) => {
-      const net = config ?? (await fetchPublicConfig());
+      const net = config ?? (await fetchPublicConfig().catch(() => null)) ?? DEFAULT_CONFIG;
       if (!config) setConfig(net);
       return sendWalletCall(net, call, hooks);
     },

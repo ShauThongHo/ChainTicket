@@ -1,5 +1,24 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileText,
+  History,
+  Lock,
+  Plus,
+  QrCode,
+  ShieldAlert,
+  ShieldCheck,
+  Ticket,
+  Upload,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { PhaseBadge } from "@/components/phase-badge";
@@ -9,12 +28,20 @@ import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fetchOrganizer, fetchOrganizerEventLedger, refundEvent, withdrawEvent, uploadPoster, escalatePayout, executePayout } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import {
+  escalatePayout,
+  executePayout,
+  fetchOrganizer,
+  fetchOrganizerEventLedger,
+  refundEvent,
+  uploadPoster,
+  withdrawEvent,
+} from "@/lib/api";
 import { friendlyChainError } from "@/lib/chain-errors";
 import { explorerAddress, explorerTx, gatewayUrl } from "@/lib/explorer";
 import type { LedgerRow, OrganizerEvent } from "@/lib/types";
 import { checkInPct, formatAmount, paySymbol, shortAddr } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/organizer")({ component: OrganizerLayout });
 
@@ -43,18 +70,30 @@ function OrganizerHome() {
   if (!me) {
     return (
       <AppShell>
-        <p className="text-sm text-muted">Connect a wallet.</p>
+        <div className="rounded-2xl border border-dashed border-border bg-bg-elevated p-12 text-center my-8">
+          <Building2 className="size-12 text-muted mx-auto mb-3 stroke-[1.2]" />
+          <h2 className="font-display text-2xl font-bold">Connect Organizer Wallet</h2>
+          <p className="mt-1 text-sm text-muted max-w-sm mx-auto">
+            Please connect your wallet with authorized organizer credentials to manage shows and vault funds.
+          </p>
+        </div>
       </AppShell>
     );
   }
+
   if (!me.isOrganizer) {
     return (
       <AppShell>
-        <h1 className="font-display text-4xl italic">Organizer portal</h1>
-        <p className="mt-3 max-w-lg text-sm text-muted">
-          This wallet is not on the organizer list. Ask the platform admin to verify{" "}
-          <span className="font-mono">{me.address}</span>.
-        </p>
+        <div className="rounded-2xl border border-danger/30 bg-danger/5 p-8 text-center my-8 max-w-xl mx-auto">
+          <ShieldAlert className="size-10 text-danger mx-auto mb-3" />
+          <h1 className="font-display text-2xl font-bold text-fg">Organizer License Required</h1>
+          <p className="mt-2 text-sm text-muted leading-relaxed">
+            Wallet address <code className="font-mono text-fg bg-mist px-1.5 py-0.5 rounded text-xs">{me.address}</code> is not currently on the platform approved organizer whitelist.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Contact the platform governance administrator to grant organizer publishing privileges.
+          </p>
+        </div>
       </AppShell>
     );
   }
@@ -64,41 +103,80 @@ function OrganizerHome() {
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl italic">{me.organizerName}</h1>
+      {/* ORGANIZER PORTAL HERO */}
+      <div className="mb-6 border-b border-border pb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
+            {me.organizerName || "Organizer"}
+          </h1>
+
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-1.5 shadow-2xs">
+              <Link to="/organizer/scan">
+                <QrCode className="size-3.5" />
+                <span>Scanner</span>
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5 shadow-xs font-semibold">
+              <Link to="/organizer/mint">
+                <Plus className="size-4" />
+                <span>Mint Show</span>
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link to="/organizer/scan">Scan tickets</Link>
-          </Button>
-          <Button asChild>
-            <Link to="/organizer/mint">New event</Link>
-          </Button>
+
+        {/* METRICS ROW */}
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="p-4 bg-bg-elevated border-border">
+            <div className="flex items-center justify-between text-muted text-xs font-medium uppercase tracking-wider">
+              <span>Vault Locked</span>
+              <Lock className="size-4 text-primary" />
+            </div>
+            <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-fg">
+              {formatAmount(locked, symbol)}
+            </p>
+          </Card>
+
+          <Card className="p-4 bg-bg-elevated border-border">
+            <div className="flex items-center justify-between text-muted text-xs font-medium uppercase tracking-wider">
+              <span>Active Shows</span>
+              <Calendar className="size-4 text-sage" />
+            </div>
+            <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-fg">{activeCount}</p>
+          </Card>
+
+          <Card className="p-4 bg-bg-elevated border-border">
+            <div className="flex items-center justify-between text-muted text-xs font-medium uppercase tracking-wider">
+              <span>Spendable</span>
+              <Wallet className="size-4 text-primary" />
+            </div>
+            <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-fg">
+              {formatAmount(me.spendableCents, symbol)}
+            </p>
+          </Card>
         </div>
-      </div>
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Card className="p-4">
-          <p className="text-xs text-muted">Locked in vaults</p>
-          <p className="mt-1 font-mono text-2xl tabular-nums">{formatAmount(locked, symbol)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted">Active events</p>
-          <p className="mt-1 font-mono text-2xl tabular-nums">{activeCount}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted">Withdrawable ledger</p>
-          <p className="mt-1 font-mono text-2xl tabular-nums">{formatAmount(me.spendableCents, symbol)}</p>
-        </Card>
       </div>
 
       <ChainDialog {...chain} onClose={chain.close} />
 
-      <h2 className="mt-10 flex items-center gap-2 font-display text-2xl italic">Your events <Hint>New events use a seven-day objection window after the show. One third or more opposition sends the request to Admin review. Older events keep their original support vote.</Hint></h2>
-      <div className="mt-4 grid gap-3">
+      {/* EVENTS MANAGEMENT TABLE */}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-display text-xl font-bold tracking-tight text-fg">Shows</h2>
+        <span className="font-mono text-xs text-muted">{events.length}</span>
+      </div>
+
+      <div className="grid gap-3">
         {events.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">No shows yet. <Link to="/organizer/mint" className="underline">Create an event</Link></Card>
+          <div className="rounded-xl border border-dashed border-border bg-bg-elevated p-10 text-center">
+            <Ticket className="size-8 text-muted mx-auto mb-2 stroke-[1.5]" />
+            <h3 className="font-display text-base font-bold">No events created yet</h3>
+            <Button asChild size="sm" className="mt-3">
+              <Link to="/organizer/mint">Mint Show →</Link>
+            </Button>
+          </div>
         ) : null}
+
         {events.map((ev) => (
           <OrganizerEventCard
             key={ev.id}
@@ -106,11 +184,19 @@ function OrganizerHome() {
             explorer={explorer}
             symbol={symbol}
             onDone={() => void reload()}
-            runChain={(title, labels, task) => chain.run({ title, labels, task: async (advance) => { await task(advance); return "The update is complete."; } })}
+            runChain={(title, labels, task) =>
+              chain.run({
+                title,
+                labels,
+                task: async (advance) => {
+                  await task(advance);
+                  return "On-chain transaction confirmed and synced.";
+                },
+              })
+            }
           />
         ))}
       </div>
-
     </AppShell>
   );
 }
@@ -161,17 +247,18 @@ function OrganizerEventCard({
 
   async function requestWithdraw() {
     const labels = gov
-      ? ["Open holder vote", "Wait one block", "Index proposal"]
+      ? ["Open holder vote", "Wait for block receipt", "Index proposal in ledger"]
       : ["Submit request", "Wait for admin"];
     try {
-      await runChain("Request a payout", labels, async (tick) => {
+      await runChain("Request vault payout", labels, async (tick) => {
         tick(0);
         const res = await withdrawEvent({ data: { eventId: ev.id } });
         tick(labels.length);
-        const status = res.ref && typeof res.ref === "object" && "status" in res.ref ? String(res.ref.status) : "";
-        if (status === "passed") toast.success("Vote passed. You can now withdraw.");
-        else if (gov) toast.success("Holder vote opened.");
-        else toast.success("Payout request sent for review.");
+        const status =
+          res.ref && typeof res.ref === "object" && "status" in res.ref ? String(res.ref.status) : "";
+        if (status === "passed") toast.success("Vote passed. Payout ready for execution.");
+        else if (gov) toast.success("7-Day ticket holder objection window opened.");
+        else toast.success("Payout request submitted for audit.");
         onDone();
       });
     } catch (e) {
@@ -180,13 +267,13 @@ function OrganizerEventCard({
   }
 
   async function execute() {
-    const labels = ["Execute withdraw", "Wait one block", "Index"];
+    const labels = ["Execute withdraw", "Wait for block receipt", "Sync vault ledger"];
     try {
       await runChain("Withdraw event funds", labels, async (tick) => {
         tick(1);
         await executePayout({ data: { eventId: ev.id } });
         tick(3);
-        toast.success("Funds sent to your wallet.");
+        toast.success("Vault funds successfully transferred to your wallet.");
         onDone();
       });
     } catch (e) {
@@ -195,20 +282,22 @@ function OrganizerEventCard({
   }
 
   async function escalate() {
-    const labels = ["Pin materials", "Escalate on-chain", "Index"];
+    const labels = ["Pin evidence to IPFS", "Escalate on-chain", "Sync review status"];
     try {
-      await runChain("Send payout for review", labels, async (tick) => {
+      await runChain("Escalate payout to Admin review", labels, async (tick) => {
         let uri = materials.trim();
         if (file) {
           const base64 = await readBase64(file);
-          const pinned = await uploadPoster({ data: { filename: file.name, contentType: file.type || "application/octet-stream", base64 } });
+          const pinned = await uploadPoster({
+            data: { filename: file.name, contentType: file.type || "application/octet-stream", base64 },
+          });
           uri = pinned.uri;
         }
-        if (!uri) throw new Error("Add a payout document first.");
+        if (!uri) throw new Error("Please attach or enter IPFS proof document.");
         tick(1);
         await escalatePayout({ data: { eventId: ev.id, materialsUri: uri } });
         tick(3);
-        toast.success("Sent to admin for review.");
+        toast.success("Sent to Platform Administrator review queue.");
         onDone();
       });
     } catch (e) {
@@ -217,76 +306,98 @@ function OrganizerEventCard({
   }
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <Card className="rounded-2xl border border-border bg-bg-elevated p-6 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <div className="flex flex-wrap gap-2">
+          {/* BADGES LINE */}
+          <div className="flex flex-wrap items-center gap-2">
             <PhaseBadge phase={ev.phase} />
-            {ev.frozen ? <Badge tone="danger">Frozen</Badge> : null}
-            {ev.withdrawn ? <Badge tone="ink">Withdrawn</Badge> : null}
-            {ev.withdrawRequest === "pending" ? <Badge>Admin review</Badge> : null}
-            {ev.withdrawRequest === "pending_vote" ? <Badge>Voting</Badge> : null}
-            {ev.withdrawRequest === "passed" ? <Badge tone="sage">{opposition ? "Vote window passed" : "2/3 reached"}</Badge> : null}
-            {ev.withdrawRequest === "escalated" ? <Badge tone="danger">Escalated</Badge> : null}
-            {ev.engineVersion < 3 ? <Badge>Legacy payout</Badge> : null}
-            {gov && !ev.collectionAddress ? <Badge tone="danger">No NFT — remint</Badge> : null}
-            <Badge tone="sage">{checkInPct(ev.checkInRate)} checked in</Badge>
+            {ev.frozen ? <Badge tone="danger">Trading Paused</Badge> : null}
+            {ev.withdrawn ? <Badge tone="ink">Vault Withdrawn</Badge> : null}
+            {ev.withdrawRequest === "pending" ? <Badge>Admin Review</Badge> : null}
+            {ev.withdrawRequest === "pending_vote" ? <Badge tone="sage">7-Day Objection Window</Badge> : null}
+            {ev.withdrawRequest === "passed" ? (
+              <Badge tone="sage">{opposition ? "Objection Window Passed" : "2/3 Quorum Reached"}</Badge>
+            ) : null}
+            {ev.withdrawRequest === "escalated" ? <Badge tone="danger">Escalated to Admin</Badge> : null}
+            <Badge tone="sage" className="font-mono text-[11px]">
+              Gate Check-in: {checkInPct(ev.checkInRate)}
+            </Badge>
           </div>
-          <h3 className="mt-1 font-display text-xl italic">{ev.name}</h3>
-          <p className="text-sm text-muted">
-            {ev.venue} · sold {ev.sold}/{ev.supply} · gate {ev.checkedIn}/{ev.sold || 0} · vault{" "}
-            {formatAmount(ev.lockedCents, symbol)}
+
+          {/* EVENT NAME & SUMMARY */}
+          <h3 className="mt-2.5 font-display text-2xl font-bold tracking-tight text-fg">{ev.name}</h3>
+          <p className="mt-1 text-xs text-muted font-mono">
+            {ev.venue} · Passes: {ev.sold} / {ev.supply} sold · Gate Checked In: {ev.checkedIn} / {ev.sold || 0}
           </p>
-          {ev.withdrawRequest === "pending_vote" || ev.withdrawRequest === "passed" || ev.withdrawRequest === "escalated" ? (
-            <p className="mt-1 text-sm text-muted">
-              {opposition ? "Opposed" : "Support"} {ev.proposalYes}/{ev.proposalSold}
-              {ev.proposalSold > 0 ? opposition ? ` · admin review at ${need}+` : ` · need ${need}` : " · no holders"}
-              {ev.proposalDeadline ? ` · deadline ${new Date(ev.proposalDeadline).toLocaleString()}` : ""}
-            </p>
+          <p className="mt-1 font-mono text-xs text-primary font-semibold">
+            Vault Balance: {formatAmount(ev.lockedCents, symbol)}
+          </p>
+
+          {/* GOVERNANCE OBJECTION STATUS */}
+          {ev.withdrawRequest === "pending_vote" ||
+          ev.withdrawRequest === "passed" ||
+          ev.withdrawRequest === "escalated" ? (
+            <div className="mt-2.5 rounded-lg border border-border bg-mist/30 px-3 py-1.5 text-xs font-mono text-muted">
+              <span>{opposition ? "Objection Tally" : "Support Tally"}: </span>
+              <strong className="text-fg font-bold">
+                {ev.proposalYes} / {ev.proposalSold}
+              </strong>
+              {ev.proposalSold > 0
+                ? opposition
+                  ? ` · Escalation threshold: ${need}+ objections`
+                  : ` · Quorum required: ${need}`
+                : " · No passes sold"}
+              {ev.proposalDeadline ? ` · Window Deadline: ${new Date(ev.proposalDeadline).toLocaleString()}` : ""}
+            </div>
           ) : null}
-          {ev.materialsUri ? (
-            <p className="mt-1 font-mono text-xs">
-              <a className="text-primary underline" href={gatewayUrl(ev.materialsUri, config?.ipfsGateway)} target="_blank" rel="noreferrer">
-                payout materials
-              </a>
-            </p>
-          ) : null}
-          <p className="mt-2 font-mono text-xs text-muted">
+
+          {/* CONTRACT LINK PILLS */}
+          <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-xs text-muted">
             {ev.vaultAddress ? (
-              <a className="text-primary underline" href={explorerAddress(ev.vaultAddress, explorer)} target="_blank" rel="noreferrer">
-                vault {shortAddr(ev.vaultAddress)}
+              <a
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+                href={explorerAddress(ev.vaultAddress, explorer)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span>Vault {shortAddr(ev.vaultAddress)}</span>
+                <ExternalLink className="size-3" />
               </a>
             ) : null}
             {ev.marketplaceAddress ? (
-              <>
-                {" · "}
-                <a className="text-primary underline" href={explorerAddress(ev.marketplaceAddress, explorer)} target="_blank" rel="noreferrer">
-                  market {shortAddr(ev.marketplaceAddress)}
-                </a>
-              </>
+              <a
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+                href={explorerAddress(ev.marketplaceAddress, explorer)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span>Market {shortAddr(ev.marketplaceAddress)}</span>
+                <ExternalLink className="size-3" />
+              </a>
             ) : null}
-            {ev.collectionAddress ? (
-              <>
-                {" · "}
-                <a className="text-primary underline" href={explorerAddress(ev.collectionAddress, explorer)} target="_blank" rel="noreferrer">
-                  collection {shortAddr(ev.collectionAddress)}
-                </a>
-              </>
-            ) : null}
-          </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* ORGANIZER ACTION BUTTONS GROUP */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* CANCEL & REFUND BUTTON */}
           <Button
             variant="outline"
+            size="sm"
             disabled={ended || ev.cancelled}
             onClick={async () => {
-              const labels = ["Confirm event cancellation", "Refund ticket holders", "Save updates"];
+              const labels = [
+                "Confirm cancellation intent",
+                "Refund ticket holders on-chain",
+                "Mark event cancelled in database",
+              ];
               try {
-                await runChain("Cancel event and refund tickets", labels, async (tick) => {
+                await runChain("Cancel event & refund all holders", labels, async (tick) => {
                   tick(1);
                   await refundEvent({ data: { eventId: ev.id } });
                   tick(3);
-                  toast.success("Refunds sent to ticket holders.");
+                  toast.success("Full refund successfully broadcast to ticket holders.");
                   onDone();
                 });
               } catch (e) {
@@ -294,67 +405,143 @@ function OrganizerEventCard({
               }
             }}
           >
-            Cancel & refund
+            Cancel & Refund
           </Button>
+
+          {/* OPEN HOLDER VOTE / REQUEST WITHDRAW */}
           {!open && !ev.withdrawn ? (
-            <Button disabled={!ended || ev.frozen || (gov && !ev.collectionAddress)} onClick={() => void requestWithdraw()}>
-              {gov ? "Open holder vote" : "Request withdraw"}
+            <Button
+              size="sm"
+              disabled={!ended || ev.frozen || (gov && !ev.collectionAddress)}
+              onClick={() => void requestWithdraw()}
+              className="font-semibold shadow-xs"
+            >
+              {gov ? "Open Holder Vote" : "Request Withdraw"}
             </Button>
           ) : null}
-          {!ended && !ev.withdrawn ? <p className="basis-full text-right text-xs text-muted">Withdrawals unlock {new Date(ev.endsAt).toLocaleString()}.</p> : null}
-          {(ev.withdrawRequest === "passed" || (opposition && ev.withdrawRequest === "pending_vote" && deadlinePassed && (ev.proposalSold === 0 || ev.proposalYes * 3 < ev.proposalSold))) && !ev.withdrawn ? (
-            <Button disabled={ev.frozen} onClick={() => void execute()}>
-              Execute withdraw
+
+          {/* EXECUTE WITHDRAW */}
+          {(ev.withdrawRequest === "passed" ||
+            (opposition &&
+              ev.withdrawRequest === "pending_vote" &&
+              deadlinePassed &&
+              (ev.proposalSold === 0 || ev.proposalYes * 3 < ev.proposalSold))) &&
+          !ev.withdrawn ? (
+            <Button
+              size="sm"
+              disabled={ev.frozen}
+              onClick={() => void execute()}
+              className="font-bold bg-success text-paper hover:bg-success/90 shadow-xs"
+            >
+              Execute Withdraw
             </Button>
           ) : null}
         </div>
       </div>
+
+      {!ended && !ev.withdrawn ? (
+        <p className="mt-2 text-right font-mono text-[11px] text-muted">
+          Withdrawals unlock upon event conclusion: {new Date(ev.endsAt).toLocaleString()}.
+        </p>
+      ) : null}
+
+      {/* ESCALATE EVIDENCE FORM */}
       {gov && ev.withdrawRequest === "pending_vote" ? (
-        <div className="mt-4 grid gap-2 border-t border-border pt-4">
-          <p className="text-xs text-muted">
+        <div className="mt-4 rounded-xl border border-border bg-mist/20 p-4">
+          <p className="text-xs text-muted mb-2 leading-relaxed">
             {deadlinePassed
               ? opposition
                 ? ev.proposalSold > 0 && ev.proposalYes * 3 >= ev.proposalSold
-                  ? "The 7-day window ended with at least one third opposed. Upload payout materials for Admin review."
-                  : "The 7-day window ended below the objection threshold. Withdraw the funds when ready."
-                : "The vote missed 2/3. Upload payout materials for Admin review."
-              : opposition ? "Ticket holders can oppose for 7 days. At one third or more, Admin reviews the payout." : "Voting is open. Escalate unlocks only after the deadline."}
+                  ? "The 7-day objection window ended with over 1/3 opposed. Upload performance documentation to request Platform Admin arbitration."
+                  : "The 7-day objection window ended safely below threshold. You may now execute payout."
+                : "The vote missed quorum threshold. Upload documentation for Admin review."
+              : opposition
+                ? "Ticket holders may file objections for 7 days. At 1/3 opposition, dispute triggers Admin arbitration."
+                : "Voting window is open. Escalation unlocks after deadline."}
           </p>
-          <Input
-            type="file"
-            accept="image/*,.pdf,.txt"
-            disabled={!deadlinePassed || (opposition && ev.proposalSold > 0 && ev.proposalYes * 3 < ev.proposalSold)}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <Input
-            placeholder="or paste ipfs://… materials URI"
-            value={materials}
-            disabled={!deadlinePassed || (opposition && ev.proposalSold > 0 && ev.proposalYes * 3 < ev.proposalSold)}
-            onChange={(e) => setMaterials(e.target.value)}
-          />
-          <Button variant="outline" disabled={!deadlinePassed || ev.frozen || (opposition && (ev.proposalSold === 0 || ev.proposalYes * 3 < ev.proposalSold))} onClick={() => void escalate()}>
-            Escalate to admin
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="file"
+              accept="image/*,.pdf,.txt"
+              className="text-xs max-w-xs"
+              disabled={
+                !deadlinePassed ||
+                (opposition && ev.proposalSold > 0 && ev.proposalYes * 3 < ev.proposalSold)
+              }
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <Input
+              placeholder="or paste ipfs://… evidence CID"
+              value={materials}
+              className="text-xs max-w-xs"
+              disabled={
+                !deadlinePassed ||
+                (opposition && ev.proposalSold > 0 && ev.proposalYes * 3 < ev.proposalSold)
+              }
+              onChange={(e) => setMaterials(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                !deadlinePassed ||
+                ev.frozen ||
+                (opposition && (ev.proposalSold === 0 || ev.proposalYes * 3 < ev.proposalSold))
+              }
+              onClick={() => void escalate()}
+            >
+              Escalate to Admin
+            </Button>
+          </div>
         </div>
       ) : null}
-      <details className="mt-4 border-t border-border pt-3" onToggle={(event) => {
-        if (event.currentTarget.open && !ledgerLoaded) {
-          setLedgerLoaded(true);
-          void fetchOrganizerEventLedger({ data: { eventId: ev.id } }).then(setLedger).catch((error) => {
-            setLedgerLoaded(false);
-            toast.error(friendlyChainError(error));
-          });
-        }
-      }}>
-        <summary className="cursor-pointer text-sm font-medium">Event history <span className="text-muted">({ledger.length})</span></summary>
-        {ledger.length === 0 ? <p className="pt-3 text-xs text-muted">No recorded activity yet.</p> : (
-          <div className="mt-2 divide-y divide-border">
-            {ledger.map((row) => <div key={row.id} className="flex flex-wrap justify-between gap-2 py-2 text-xs">
-              <span>{row.kind} · {new Date(row.createdAt).toLocaleString()}</span>
-              <span className="font-mono text-muted">{formatAmount(row.amountCents, symbol)} · {row.onChain
-                ? <a className="text-primary underline" href={explorerTx(row.ref, explorer)} target="_blank" rel="noreferrer">{row.ref.slice(0, 12)}…</a>
-                : row.ref.slice(0, 18)}</span>
-            </div>)}
+
+      {/* EVENT FINANCIAL LEDGER DETAILS */}
+      <details
+        className="mt-4 border-t border-border/60 pt-3"
+        onToggle={(event) => {
+          if (event.currentTarget.open && !ledgerLoaded) {
+            setLedgerLoaded(true);
+            void fetchOrganizerEventLedger({ data: { eventId: ev.id } })
+              .then(setLedger)
+              .catch((error) => {
+                setLedgerLoaded(false);
+                toast.error(friendlyChainError(error));
+              });
+          }
+        }}
+      >
+        <summary className="cursor-pointer font-mono text-xs font-semibold text-primary hover:underline flex items-center gap-1.5">
+          <History className="size-3.5" />
+          <span>Financial Activity Ledger ({ledger.length})</span>
+        </summary>
+        {ledger.length === 0 ? (
+          <p className="pt-2 font-mono text-xs text-muted">No transactions recorded yet.</p>
+        ) : (
+          <div className="mt-3 divide-y divide-border/60 font-mono text-xs">
+            {ledger.map((row) => (
+              <div key={row.id} className="flex flex-wrap justify-between gap-2 py-2">
+                <span className="text-fg font-medium">
+                  {row.kind} · {new Date(row.createdAt).toLocaleString()}
+                </span>
+                <span className="text-muted">
+                  {formatAmount(row.amountCents, symbol)} ·{" "}
+                  {row.onChain ? (
+                    <a
+                      className="text-primary underline"
+                      href={explorerTx(row.ref, explorer)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      tx {row.ref.slice(0, 10)}…
+                    </a>
+                  ) : (
+                    row.ref.slice(0, 14)
+                  )}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </details>
