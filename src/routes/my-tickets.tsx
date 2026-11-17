@@ -32,6 +32,7 @@ import artifacts from "@/lib/abi/core.json";
 import { cancelListing, confirmVote, fetchMyTickets, fetchQr, quoteList, sellTicket } from "@/lib/api";
 import { friendlyChainError } from "@/lib/chain-errors";
 import { explorerToken, gatewayUrl } from "@/lib/explorer";
+import { updateActiveChainRun } from "@/lib/tx-state";
 import type { MyTicket, QrPayload } from "@/lib/types";
 import { formatAmount, paySymbol, priceBounds, shortAddr } from "@/lib/utils";
 
@@ -322,6 +323,7 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
           const quote = await quoteList({ data: { ticketId: ticket.id, priceCents: cents } });
           if (!quote.marketplace) throw new Error("No marketplace contract.");
           advance(1);
+          updateActiveChainRun({ resumePayload: { action: "sellTicket", data: { ticketId: ticket.id, priceCents: cents } } });
           const hash = await sendUserCall({
             to: quote.marketplace as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,
@@ -352,6 +354,8 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
         title: "Remove your ticket listing",
         labels,
         task: async (advance) => {
+          advance(0);
+          updateActiveChainRun({ resumePayload: { action: "cancelListing", data: { ticketId: ticket.id } } });
           const hash = await sendUserCall({
             to: market as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,
@@ -388,6 +392,8 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
         title: opposing ? "Object to organizer payout" : "Vote on organizer payout",
         labels,
         task: async (advance) => {
+          advance(0);
+          updateActiveChainRun({ resumePayload: { action: "confirmVote", data: { ticketId: ticket.id } } });
           const hash = await sendUserCall({
             to: market as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,

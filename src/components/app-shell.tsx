@@ -1,12 +1,19 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Menu, Wallet, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Menu, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { LoadingVeil, ModalShell } from "@/components/tx-dialog";
+import { ChainDialog, isRouteDialogMounted, LoadingVeil, ModalShell } from "@/components/tx-dialog";
+import { markSteps } from "@/components/tx-progress";
 import { Button } from "@/components/ui/button";
 import { portalFor, useSession } from "@/components/session";
 import { formatAmount, paySymbol, shortAddr } from "@/lib/utils";
 import { getAddress } from "viem";
+import {
+  clearActiveChainRun,
+  loadActiveChainRun,
+  requestOpenChainDialog,
+  type PersistedChainRun,
+} from "@/lib/tx-state";
 
 function Brand() {
   return (
@@ -17,6 +24,62 @@ function Brand() {
         <span className="text-[10px] font-mono leading-none text-muted">Vaulted Web3 Passes</span>
       </div>
     </Link>
+  );
+}
+
+function ActiveChainFloatingPill({ explorer }: { explorer: string }) {
+  const [run, setRun] = useState<PersistedChainRun | null>(null);
+
+  useEffect(() => {
+    setRun(loadActiveChainRun());
+    const onChange = () => {
+      setRun(loadActiveChainRun());
+    };
+    window.addEventListener("ct:chain-run-changed", onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener("ct:chain-run-changed", onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+
+  if (!run) return null;
+
+  const isRunning = run.status === "running";
+  const isSuccess = run.status === "success";
+
+  return (
+    <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2.5 rounded-full border border-border bg-bg-elevated/95 px-3.5 py-2 text-xs shadow-lg backdrop-blur-md transition-all">
+      {isRunning ? (
+        <Loader2 className="size-3.5 animate-spin text-primary" />
+      ) : isSuccess ? (
+        <CheckCircle2 className="size-3.5 text-sage" />
+      ) : (
+        <AlertTriangle className="size-3.5 text-danger" />
+      )}
+      <span className="max-w-[180px] sm:max-w-[240px] truncate font-medium">
+        {isRunning
+          ? `${run.title || "Transaction"} confirming…`
+          : isSuccess
+            ? `${run.title || "Transaction"} confirmed`
+            : `${run.title || "Transaction"} failed`}
+      </span>
+      <button
+        onClick={() => requestOpenChainDialog()}
+        className="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary hover:bg-primary/20 cursor-pointer"
+      >
+        View
+      </button>
+      {!isRunning ? (
+        <button
+          onClick={() => clearActiveChainRun()}
+          className="text-muted hover:text-fg ml-0.5 cursor-pointer"
+          title="Dismiss"
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -36,9 +99,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const [fallbackRun, setFallbackRun] = useState<PersistedChainRun | null>(null);
   const lastIdentity = useRef<string | null>(null);
   const symbol = paySymbol(config);
   const veiled = gate !== "off";
+
+  useEffect(() => {
+    function onOpen() {
+      if (!isRouteDialogMounted()) {
+        const run = loadActiveChainRun();
+        if (run) setFallbackRun(run);
+      }
+    }
+    window.addEventListener("ct:chain-dialog-open", onOpen);
+    return () => window.removeEventListener("ct:chain-dialog-open", onOpen);
+  }, []);
 
   useEffect(() => {
     const identity = me ? `${me.address.toLowerCase()}:${me.role}` : null;
@@ -195,6 +270,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </ModalShell>
       ) : null}
       {gate === "load" ? <LoadingVeil text="Loading your account…" /> : null}
+      <ActiveChainFloatingPill explorer={config?.explorerUrl || "https://gnosis-chiado.blockscout.com"} />
+      {fallbackRun ? (
+        <ChainDialog
+          open={Boolean(fallbackRun)}
+          title={fallbackRun.title}
+          steps={markSteps(fallbackRun.labels, fallbackRun.currentStep, fallbackRun.status === "error")}
+          error={fallbackRun.error ?? null}
+          summary={fallbackRun.summary ?? null}
+          doneLabel={fallbackRun.doneLabel || "Close"}
+          txHash={fallbackRun.txHash}
+          explorerUrl={config?.explorerUrl || "https://gnosis-chiado.blockscout.com"}
+          onClose={() => {
+            setFallbackRun(null);
+            clearActiveChainRun();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

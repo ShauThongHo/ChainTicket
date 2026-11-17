@@ -30,6 +30,7 @@ import { isInventoryRace } from "@/lib/chain-errors";
 import { explorerAddress, explorerToken, explorerTx, gatewayUrl } from "@/lib/explorer";
 import type { EventDetail } from "@/lib/types";
 import { formatAmount, paySymbol, shortAddr } from "@/lib/utils";
+import { updateActiveChainRun } from "@/lib/tx-state";
 
 export const Route = createFileRoute("/events/$eventId")({ component: EventPage });
 
@@ -100,6 +101,7 @@ function EventPage() {
             }
           }
           advance(1);
+          updateActiveChainRun({ resumePayload: { action: "buyNow", data: { tierId, chainId: quote.chainId } } });
           const hash = await sendUserCall(
             {
               to: quote.marketplace as `0x${string}`,

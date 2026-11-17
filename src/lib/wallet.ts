@@ -14,6 +14,7 @@ import { RECEIPT_CONFIRMATIONS } from "@/lib/receipt";
 import { friendlyChainError } from "@/lib/chain-errors";
 import type { PublicConfig } from "@/lib/types";
 import { assertChainIdMatches } from "@/lib/network-config";
+import { updateActiveChainRun } from "@/lib/tx-state";
 
 const PREVIEW_KEY = "ct_preview_pk";
 export const SESSION_KEY = "ct_session";
@@ -194,6 +195,7 @@ export async function sendUserCall(
         chain,
       });
     }
+    updateActiveChainRun({ txHash: hash, currentStep: 2 });
     hooks?.onSubmitted?.(hash);
     let receipt: Awaited<ReturnType<typeof publicClient.waitForTransactionReceipt>>;
     while (true) {
@@ -215,6 +217,47 @@ export async function sendUserCall(
   } catch (err) {
     throw new Error(friendlyChainError(err));
   }
+}
+
+export async function waitForTxReceipt(
+  net: PublicConfig | null | undefined,
+  hash: Hex,
+  maxAttempts = 30,
+): Promise<{ status: "success" | "reverted"; blockNumber: bigint }> {
+  const config = net ?? {
+    chainId: 10200,
+    chainName: "Gnosis Chiado",
+    nativeSymbol: "XDAI",
+    rpcUrl: "https://rpc.chiadochain.net",
+    explorerUrl: "https://gnosis-chiado.blockscout.com",
+    ipfsGateway: "https://dweb.link",
+    adminConfigured: false,
+    devMode: false,
+    demoBank: null,
+    pinataReady: false,
+    setupComplete: false,
+  };
+  const chain = chainOf(config);
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(config.rpcUrl || "https://rpc.chiadochain.net", { timeout: 40_000 }),
+  });
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const receipt = await publicClient.getTransactionReceipt({ hash });
+      if (receipt) {
+        return {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber,
+        };
+      }
+    } catch {
+      // not yet mined or waiting for block
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("Transaction confirmation check timed out on the network.");
 }
 
 export function saveSession(token: string, mode: "preview" | "injected" = "preview") {
