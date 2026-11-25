@@ -57,6 +57,10 @@ pnpm-debug.log*
 screenshots/
 artifacts/
 attachments/
+static/
+live_dump/
+raw_remote/
+scripts/
 
 # Python scripts cache
 __pycache__/
