@@ -294,3 +294,39 @@ export type PendingIndexRow = {
   error: string | null;
   createdAt: string;
 };
+
+export type HomeOverview = {
+  stats: {
+    passesMinted: number;
+    passesClaimed: number;
+    liveEvents: number;
+    checkedIn: number;
+  };
+  royaltyBps: number;
+  featured: {
+    id: number;
+    name: string;
+    venue: string;
+    category: string;
+    startsAt: string;
+    endsAt: string;
+    phase: EventPhase;
+    organizerWallet: string;
+    organizerName: string | null;
+    collectionAddress: string | null;
+    deployTx: string | null;
+    topTierName: string | null;
+    sampleChainId: number | null;
+    minCents: number | null;
+    available: number;
+    supply: number;
+  } | null;
+  latestActivity: {
+    kind: string;
+    actor: string | null;
+    eventName: string | null;
+    amountCents: number;
+    ref: string;
+    createdAt: string;
+  } | null;
+};

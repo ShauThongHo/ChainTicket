@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — My Tickets</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 背景与拓扑星尘层 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. 顶部 Header 组件 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .btn-connect {
+    background: #ffffff;
+    color: #040605;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  }
+
+  .btn-connect:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 24px rgba(134, 239, 172, 0.35);
+  }
+
+  /* ================= 3. My Tickets 主容器 ================= */
+  .vault-shell {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 132px 32px 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .glass-vault-panel {
+    position: relative;
+    width: 100%;
+    min-height: 360px;
+    border-radius: 26px;
+    padding: 56px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: linear-gradient(
+      155deg,
+      rgba(18, 28, 23, 0.62) 0%,
+      rgba(8, 12, 10, 0.74) 100%
+    );
+    backdrop-filter: blur(26px);
+    -webkit-backdrop-filter: blur(26px);
+    border: 1.5px dashed rgba(134, 239, 172, 0.24);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.72),
+      0 0 60px rgba(52, 211, 153, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+    transition: border-color 0.35s, box-shadow 0.35s;
+  }
+
+  .glass-vault-panel:hover {
+    border-color: rgba(134, 239, 172, 0.42);
+    box-shadow:
+      0 36px 90px rgba(0, 0, 0, 0.8),
+      0 0 75px rgba(110, 231, 183, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  .glass-vault-panel::before {
+    content: "";
+    position: absolute;
+    top: -35%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 65%;
+    height: 220px;
+    background: radial-gradient(ellipse at center, rgba(110, 231, 183, 0.16) 0%, transparent 72%);
+    pointer-events: none;
+  }
+
+  .wallet-icon-box {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    border-radius: 20px;
+    background: linear-gradient(145deg, rgba(110, 231, 183, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    box-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    display: grid;
+    place-items: center;
+    margin-bottom: 22px;
+    color: #86efac;
+  }
+
+  .wallet-icon-box svg {
+    width: 32px;
+    height: 32px;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    fill: none;
+  }
+
+  .vault-title {
+    font-size: clamp(1.5rem, 2.6vw, 1.95rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 12px;
+  }
+
+  .vault-desc {
+    max-width: 460px;
+    font-size: 0.94rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.56);
+    margin-bottom: 30px;
+  }
+
+  .btn-browse-shows {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    color: #040605;
+    text-decoration: none;
+    border: none;
+    padding: 13px 26px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 0 28px rgba(134, 239, 172, 0.25);
+    transition: transform 0.22s, box-shadow 0.22s, background 0.22s;
+  }
+
+  .btn-browse-shows:hover {
+    background: #a7f3d0;
+    transform: translateY(-2px);
+    box-shadow: 0 0 38px rgba(134, 239, 172, 0.45);
+  }
+
+  /* ================= 4. 毛玻璃钱包选择 & Loading 弹窗 ================= */
+  .wallet-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(2, 4, 3, 0.68);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .wallet-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(
+      160deg,
+      rgba(22, 34, 28, 0.78) 0%,
+      rgba(9, 13, 11, 0.88) 100%
+    );
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(134, 239, 172, 0.26);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.85),
+      0 0 50px rgba(52, 211, 153, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transform: translateY(16px) scale(0.96);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-modal-backdrop.open .wallet-modal-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: 22px;
+    right: 22px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s;
+  }
+
+  .modal-close-x:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    transform: rotate(90deg);
+  }
+
+  .modal-view {
+    animation: modalFadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .modal-view.hidden {
+    display: none;
+  }
+
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+
+  .modal-sub {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.56);
+    margin-bottom: 24px;
+  }
+
+  .wallet-option-btn {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-option-btn:hover {
+    background: rgba(110, 231, 183, 0.12);
+    border-color: rgba(110, 231, 183, 0.48);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), 0 0 24px rgba(110, 231, 183, 0.16);
+  }
+
+  .wallet-option-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .okx-logo-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 7px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 1.5px;
+    flex-shrink: 0;
+  }
+
+  .okx-logo-badge span {
+    background: #ffffff;
+    border-radius: 1px;
+  }
+
+  .okx-logo-badge span.empty {
+    background: transparent;
+  }
+
+  .wallet-option-name {
+    font-size: 0.98rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+  }
+
+  .wallet-option-status {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    transition: color 0.2s;
+  }
+
+  .wallet-option-btn:hover .wallet-option-status {
+    color: #86efac;
+  }
+
+  .loading-view-box {
+    padding: 6px 2px;
+  }
+
+  .loading-view-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 18px;
+  }
+
+  .loading-status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .account-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinLoader 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spinLoader {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills { display: none; }
+    .vault-shell { padding: 106px 20px 56px; }
+    .glass-vault-panel { padding: 42px 20px; min-height: 320px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. 背景与星尘波浪层 -->
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 2. 顶部 Header -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="homepage.html">Home</a>
+      <a href="marketplace.html">Marketplace</a>
+      <a href="my_ticket.html" class="active">My Tickets</a>
+    </nav>
+  </div>
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+    <button class="btn-connect" id="headerConnectBtn">Connect Wallet →</button>
+  </div>
+</header>
+
+<main class="vault-shell">
+  <!-- 3. 毛玻璃引导面板 -->
+  <section class="glass-vault-panel">
+    <div class="wallet-icon-box">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+        <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+      </svg>
+    </div>
+
+    <h2 class="vault-title">Connect Your Wallet</h2>
+    <p class="vault-desc">
+      Connect your Web3 wallet to access your encrypted digital ticket vault and dynamic gate passes.
+    </p>
+
+    <div class="vault-actions">
+      <a href="marketplace.html" class="btn-browse-shows">Browse Shows →</a>
+    </div>
+  </section>
+</main>
+
+<!-- 4. 毛玻璃钱包选择 & Loading 弹窗 -->
+<div class="wallet-modal-backdrop" id="walletModal">
+  <div class="wallet-modal-card" role="dialog" aria-modal="true" aria-labelledby="walletModalTitle">
+    <button class="modal-close-x" id="closeModalBtn" title="Close">✕</button>
+
+    <!-- 视图 1：选择钱包 -->
+    <div class="modal-view" id="walletSelectView">
+      <h3 class="modal-title" id="walletModalTitle">Choose a wallet</h3>
+      <p class="modal-sub">Pick one to sign in. You can browse shows without it.</p>
+
+      <button class="wallet-option-btn" id="okxWalletBtn" type="button">
+        <div class="wallet-option-left">
+          <div class="okx-logo-badge">
+            <span></span><span class="empty"></span><span></span>
+            <span class="empty"></span><span></span><span class="empty"></span>
+            <span></span><span class="empty"></span><span></span>
+          </div>
+          <span class="wallet-option-name">OKX Wallet</span>
+        </div>
+        <span class="wallet-option-status">Connect →</span>
+      </button>
+    </div>
+
+    <!-- 视图 2：Loading your account -->
+    <div class="modal-view hidden loading-view-box" id="walletLoadingView">
+      <h3 class="loading-view-title">Loading your account</h3>
+      <div class="loading-status-row">
+        <span class="account-spinner"></span>
+        <span>Loading your account...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ================= 1. 钱包弹窗与 Loading 切换交互 ================= */
+  (() => {
+    const headerConnectBtn = document.getElementById("headerConnectBtn");
+    const walletModal = document.getElementById("walletModal");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const okxWalletBtn = document.getElementById("okxWalletBtn");
+    const walletSelectView = document.getElementById("walletSelectView");
+    const walletLoadingView = document.getElementById("walletLoadingView");
+
+    function showSelectView() {
+      walletLoadingView.classList.add("hidden");
+      walletSelectView.classList.remove("hidden");
+      closeModalBtn.style.display = "grid";
+    }
+
+    function showLoadingView() {
+      walletSelectView.classList.add("hidden");
+      walletLoadingView.classList.remove("hidden");
+      closeModalBtn.style.display = "none";
+    }
+
+    function openWalletModal() {
+      showSelectView();
+      walletModal.classList.add("open");
+    }
+
+    function closeWalletModal() {
+      walletModal.classList.remove("open");
+      setTimeout(showSelectView, 300);
+    }
+
+    window.WalletModal = {
+      open: openWalletModal,
+      close: closeWalletModal,
+      showLoading: showLoadingView,
+      reset: showSelectView
+    };
+
+    if (headerConnectBtn) headerConnectBtn.addEventListener("click", openWalletModal);
+    if (closeModalBtn) closeModalBtn.addEventListener("click", closeWalletModal);
+
+    walletModal.addEventListener("click", (e) => {
+      if (e.target === walletModal && !walletSelectView.classList.contains("hidden")) {
+        closeWalletModal();
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !walletSelectView.classList.contains("hidden")) {
+        closeWalletModal();
+      }
+    });
+
+    okxWalletBtn.addEventListener("click", async () => {
+      showLoadingView();
+      if (window.okxwallet) {
+        try {
+          await window.okxwallet.request({ method: "eth_requestAccounts" });
+          closeWalletModal();
+        } catch (err) {
+          showSelectView();
+        }
+      }
+    });
+  })();
+
+  /* ================= 2. 全局拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 85 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.5,
+    alpha: 0.15 + Math.random() * 0.45,
+    vy: -(0.08 + Math.random() * 0.2),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 26;
+  const RIBBON_SEGS = 100;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (smoothMouse.x > -500) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 220 && dist > 0.1) {
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = (0.02 + centerGlow * 0.065);
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+
+  function animate() {
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (smoothMouse.x > -500) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 180 && dist > 0.1) {
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a})`
+        : `rgba(255, 255, 255, ${a * 0.8})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+</script>
+</body>
+</html>

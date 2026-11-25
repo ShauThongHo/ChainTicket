@@ -81,6 +81,12 @@ export const fetchEvents = createServerFn({ method: "GET" })
     return listEvents(await getSql(), data.q ?? "", context.wallet);
   });
 
+export const fetchHomeOverview = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSql } = await import("@/lib/db");
+  const { homeOverview } = await import("@/lib/engine.server");
+  return homeOverview(await getSql());
+});
+
 export const fetchEvent = createServerFn({ method: "GET" })
   .validator(z.object({ id: z.coerce.number() }))
   .handler(async ({ data }) => {

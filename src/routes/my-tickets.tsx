@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import {
-  AlertCircle,
   Calendar,
   CheckCircle2,
   Clock,
@@ -10,18 +9,14 @@ import {
   Lock,
   MapPin,
   QrCode,
-  RefreshCw,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
   Tag,
   Ticket,
   Vote,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
 import { PhaseBadge } from "@/components/phase-badge";
+import { PublicDarkShell } from "@/components/public-dark-shell";
 import { useSession } from "@/components/session";
 import { ChainDialog, useChainRun } from "@/components/tx-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +29,7 @@ import { friendlyChainError } from "@/lib/chain-errors";
 import { explorerToken, gatewayUrl } from "@/lib/explorer";
 import { updateActiveChainRun } from "@/lib/tx-state";
 import type { MyTicket, QrPayload } from "@/lib/types";
-import { formatAmount, paySymbol, priceBounds, shortAddr } from "@/lib/utils";
+import { formatAmount, paySymbol, priceBounds } from "@/lib/utils";
 
 export const Route = createFileRoute("/my-tickets")({ component: MyTicketsPage });
 
@@ -61,155 +56,175 @@ function MyTicketsPage() {
 
   const upcomingCount = tickets.filter((t) => t.status === "owned" && t.phase === "active").length;
   const listedCount = tickets.filter((t) => t.status === "listed").length;
-  const usedCount = tickets.filter((t) => t.status === "used" || t.status === "refunded" || t.phase === "ended").length;
+  const usedCount = tickets.filter(
+    (t) => t.status === "used" || t.status === "refunded" || t.phase === "ended",
+  ).length;
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (activeTab === "active") return t.status === "owned" && t.phase === "active";
       if (activeTab === "listed") return t.status === "listed";
-      if (activeTab === "past") return t.status === "used" || t.status === "refunded" || t.phase === "ended";
+      if (activeTab === "past")
+        return t.status === "used" || t.status === "refunded" || t.phase === "ended";
       return true;
     });
   }, [tickets, activeTab]);
 
   if (!me) {
     return (
-      <AppShell>
-        <div className="rounded-2xl border border-dashed border-border bg-bg-elevated p-12 text-center my-8">
-          <Wallet className="size-12 text-muted mx-auto mb-3 stroke-[1.2]" />
-          <h2 className="font-display text-2xl font-bold">Connect Your Wallet</h2>
-          <p className="mt-1 text-sm text-muted max-w-sm mx-auto">
-            Connect your Web3 wallet to access your encrypted digital ticket vault and dynamic gate passes.
-          </p>
-          <div className="mt-5">
-            <Link
-              to="/marketplace"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-xs"
-            >
-              Browse Shows →
-            </Link>
-          </div>
-        </div>
-      </AppShell>
+      <PublicDarkShell>
+        <main className="vault-shell">
+          <section className="glass-vault-panel">
+            <div className="wallet-icon-box">
+              <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+              </svg>
+            </div>
+
+            <h2 className="vault-title">Connect Your Wallet</h2>
+            <p className="vault-desc">
+              Connect your Web3 wallet to access your encrypted digital ticket vault and dynamic
+              gate passes.
+            </p>
+
+            <div className="vault-actions">
+              <Link to="/marketplace" className="btn-browse-shows">
+                Browse Shows →
+              </Link>
+            </div>
+          </section>
+        </main>
+      </PublicDarkShell>
     );
   }
 
   return (
-    <AppShell>
-      {/* DIGITAL PASSBOOK HEADER */}
-      <div className="mb-8 border-b border-border pb-6">
-        <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-fg">
-          Ticket Vault
-        </h1>
+    <PublicDarkShell>
+      <main className="vault-shell-auth">
+        {/* DIGITAL PASSBOOK HEADER */}
+        <div className="mb-8 border-b border-border pb-6">
+          <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-fg">
+            Ticket Vault
+          </h1>
 
-        {/* STATS OVERVIEW CARDS */}
-        <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard
-            label="Total Passes"
-            value={String(tickets.length)}
-            icon={<Ticket className="size-4 text-primary" />}
-          />
-          <StatCard
-            label="Ready for Entry"
-            value={String(upcomingCount)}
-            icon={<QrCode className="size-4 text-success" />}
-          />
-          <StatCard
-            label="Listed for Resale"
-            value={String(listedCount)}
-            icon={<Tag className="size-4 text-sage" />}
-          />
-          <StatCard
-            label="Spendable Balance"
-            value={formatAmount(me.spendableCents, symbol)}
-            icon={<Wallet className="size-4 text-primary" />}
-          />
-        </div>
-      </div>
-
-      {/* FILTER TABS */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-bg-elevated p-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab("all")}
-            className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-              activeTab === "all" ? "bg-primary text-primary-fg shadow-2xs font-semibold" : "text-muted hover:text-fg"
-            }`}
-          >
-            All Passes ({tickets.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("active")}
-            className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-              activeTab === "active" ? "bg-primary text-primary-fg shadow-2xs font-semibold" : "text-muted hover:text-fg"
-            }`}
-          >
-            Entry Ready ({upcomingCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("listed")}
-            className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-              activeTab === "listed" ? "bg-primary text-primary-fg shadow-2xs font-semibold" : "text-muted hover:text-fg"
-            }`}
-          >
-            Listed ({listedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("past")}
-            className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-              activeTab === "past" ? "bg-primary text-primary-fg shadow-2xs font-semibold" : "text-muted hover:text-fg"
-            }`}
-          >
-            History ({usedCount})
-          </button>
-        </div>
-
-        <Link
-          to="/marketplace"
-          className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
-        >
-          <span>Find more shows</span>
-          <span>→</span>
-        </Link>
-      </div>
-
-      {/* TICKET PASS LISTINGS */}
-      <div className="grid gap-6">
-        {filteredTickets.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-bg-elevated p-12 text-center">
-            <Ticket className="size-10 text-muted mx-auto mb-3 stroke-[1.5]" />
-            <h3 className="font-display text-xl font-bold">No tickets in this section</h3>
-            <p className="mt-1 text-sm text-muted max-w-sm mx-auto">
-              {activeTab === "all"
-                ? "You have not purchased any event tickets yet."
-                : `You currently have no tickets matching the "${activeTab}" filter.`}
-            </p>
-            {activeTab === "all" ? (
-              <Button asChild size="sm" className="mt-4">
-                <Link to="/marketplace">Explore Shows</Link>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => setActiveTab("all")}
-              >
-                Show All Passes
-              </Button>
-            )}
+          {/* STATS OVERVIEW CARDS */}
+          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard
+              label="Total Passes"
+              value={String(tickets.length)}
+              icon={<Ticket className="size-4 text-primary" />}
+            />
+            <StatCard
+              label="Ready for Entry"
+              value={String(upcomingCount)}
+              icon={<QrCode className="size-4 text-success" />}
+            />
+            <StatCard
+              label="Listed for Resale"
+              value={String(listedCount)}
+              icon={<Tag className="size-4 text-sage" />}
+            />
+            <StatCard
+              label="Spendable Balance"
+              value={formatAmount(me.spendableCents, symbol)}
+              icon={<Wallet className="size-4 text-primary" />}
+            />
           </div>
-        ) : (
-          filteredTickets.map((t) => (
-            <TicketPassCard key={t.id} ticket={t} onChange={() => void reload()} />
-          ))
-        )}
-      </div>
-    </AppShell>
+        </div>
+
+        {/* FILTER TABS */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-bg-elevated p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
+                activeTab === "all"
+                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              All Passes ({tickets.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("active")}
+              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
+                activeTab === "active"
+                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              Entry Ready ({upcomingCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("listed")}
+              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
+                activeTab === "listed"
+                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              Listed ({listedCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("past")}
+              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
+                activeTab === "past"
+                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              History ({usedCount})
+            </button>
+          </div>
+
+          <Link
+            to="/marketplace"
+            className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
+          >
+            <span>Find more shows</span>
+            <span>→</span>
+          </Link>
+        </div>
+
+        {/* TICKET PASS LISTINGS */}
+        <div className="grid gap-6">
+          {filteredTickets.length === 0 ? (
+            <div className="glass-vault-panel !min-h-[260px] !py-10">
+              <Ticket className="size-10 text-primary/70 mx-auto mb-3 stroke-[1.5]" />
+              <h3 className="font-display text-xl font-bold text-fg">No tickets in this section</h3>
+              <p className="mt-1 text-sm text-muted max-w-sm mx-auto">
+                {activeTab === "all"
+                  ? "You have not purchased any event tickets yet."
+                  : `You currently have no tickets matching the "${activeTab}" filter.`}
+              </p>
+              {activeTab === "all" ? (
+                <Link to="/marketplace" className="btn-browse-shows mt-5">
+                  Explore Shows →
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setActiveTab("all")}
+                >
+                  Show All Passes
+                </Button>
+              )}
+            </div>
+          ) : (
+            filteredTickets.map((t) => (
+              <TicketPassCard key={t.id} ticket={t} onChange={() => void reload()} />
+            ))
+          )}
+        </div>
+      </main>
+    </PublicDarkShell>
   );
 }
 
@@ -225,7 +240,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <Card className="p-4 bg-bg-elevated border-border flex flex-col justify-between">
+    <Card className="p-4 rounded-xl bg-bg-elevated/85 backdrop-blur-md border-border flex flex-col justify-between">
       <div className="flex items-center justify-between text-muted">
         <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
         {icon}
@@ -323,7 +338,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
           const quote = await quoteList({ data: { ticketId: ticket.id, priceCents: cents } });
           if (!quote.marketplace) throw new Error("No marketplace contract.");
           advance(1);
-          updateActiveChainRun({ resumePayload: { action: "sellTicket", data: { ticketId: ticket.id, priceCents: cents } } });
+          updateActiveChainRun({
+            resumePayload: { action: "sellTicket", data: { ticketId: ticket.id, priceCents: cents } },
+          });
           const hash = await sendUserCall({
             to: quote.marketplace as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,
@@ -355,7 +372,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
         labels,
         task: async (advance) => {
           advance(0);
-          updateActiveChainRun({ resumePayload: { action: "cancelListing", data: { ticketId: ticket.id } } });
+          updateActiveChainRun({
+            resumePayload: { action: "cancelListing", data: { ticketId: ticket.id } },
+          });
           const hash = await sendUserCall({
             to: market as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,
@@ -384,7 +403,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
     setBusy(true);
     const opposing = ticket.engineVersion >= 4;
     const labels = [
-      opposing ? "Confirm your objection in your wallet" : "Confirm your support vote in your wallet",
+      opposing
+        ? "Confirm your objection in your wallet"
+        : "Confirm your support vote in your wallet",
       "Record your vote",
     ];
     try {
@@ -393,7 +414,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
         labels,
         task: async (advance) => {
           advance(0);
-          updateActiveChainRun({ resumePayload: { action: "confirmVote", data: { ticketId: ticket.id } } });
+          updateActiveChainRun({
+            resumePayload: { action: "confirmVote", data: { ticketId: ticket.id } },
+          });
           const hash = await sendUserCall({
             to: market as `0x${string}`,
             abi: artifacts.EventMarketplace.abi,
@@ -425,9 +448,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
   const isUsed = ticket.status === "used";
 
   return (
-    <div className="ticket-pass overflow-hidden rounded-2xl border border-border bg-bg-elevated shadow-sm transition-all md:grid md:grid-cols-[280px_1fr]">
+    <div className="ticket-pass overflow-hidden rounded-2xl border border-border bg-bg-elevated/90 backdrop-blur-xl shadow-lg transition-all md:grid md:grid-cols-[280px_1fr]">
       {/* LEFT COLUMN: DYNAMIC GATE ACCESS HUB */}
-      <div className="relative flex flex-col justify-between border-b md:border-b-0 md:border-r border-border bg-gradient-to-b from-mist/50 to-bg-elevated p-6 text-center">
+      <div className="relative flex flex-col justify-between border-b md:border-b-0 md:border-r border-border bg-gradient-to-b from-mist/40 to-bg-elevated p-6 text-center">
         <div>
           {/* NFT ARTWORK CARD */}
           <div className="relative h-44 w-full overflow-hidden rounded-xl border border-border bg-bg shadow-2xs mb-4">
@@ -466,7 +489,8 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
               <Lock className="size-8 text-muted mx-auto mb-2" />
               <p className="text-xs font-semibold text-fg">Gate Pass Locked</p>
               <p className="text-[11px] text-muted mt-1">
-                {qr?.reason ?? "Unlocks automatically 2 hours before showtime to prevent scalper screenshots."}
+                {qr?.reason ??
+                  "Unlocks automatically 2 hours before showtime to prevent scalper screenshots."}
               </p>
               {unlockLabel ? (
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-mist/60 px-3 py-1 font-mono text-[11px] text-primary">
@@ -574,7 +598,9 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
               </div>
               <p className="mt-1 text-muted text-[11px]">
                 {ticket.engineVersion >= 4 ? "Objections recorded:" : "Support votes:"}{" "}
-                <strong className="font-mono text-fg">{ticket.proposal.yesWeight} / {ticket.proposal.soldWeight}</strong>{" "}
+                <strong className="font-mono text-fg">
+                  {ticket.proposal.yesWeight} / {ticket.proposal.soldWeight}
+                </strong>{" "}
                 tickets (1/3 threshold triggers governance freeze).
               </p>
               {canVote ? (

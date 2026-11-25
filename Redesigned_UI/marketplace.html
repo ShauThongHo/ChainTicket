@@ -1,0 +1,2452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #040605;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(110, 231, 183, 0.22);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(110, 231, 183, 0.45);
+  }
+
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .btn-connect {
+    background: #ffffff;
+    color: #040605;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-connect:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 24px rgba(134, 239, 172, 0.35);
+  }
+
+  .marketplace-shell {
+    position: relative;
+    z-index: 10;
+    padding-top: 128px;
+    padding-bottom: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-top {
+    text-align: center;
+    max-width: 760px;
+    padding: 0 24px;
+    margin-bottom: 34px;
+    z-index: 20;
+  }
+
+  .kicker-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.68);
+    margin-bottom: 20px;
+  }
+
+  .kicker-pill span {
+    color: #86efac;
+    font-weight: 500;
+  }
+
+  .hero-top h1 {
+    font-size: clamp(2.4rem, 4.4vw, 3.65rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  .hero-top .subtitle {
+    font-size: clamp(1.2rem, 2.1vw, 1.68rem);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.42);
+    letter-spacing: -0.02em;
+    margin-bottom: 18px;
+  }
+
+  .hero-desc {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.56);
+    max-width: 580px;
+    margin: 0 auto 20px;
+  }
+
+  .hero-highlights {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.62);
+    margin-bottom: 28px;
+  }
+
+  .hero-highlights span::before {
+    content: "✓ ";
+    color: #6ee7b7;
+  }
+
+  /* ---- 原位横向弹性扩展白色胶囊 Search Bar ---- */
+  .search-morph-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .morph-pill {
+    position: relative;
+    width: 222px;
+    height: 46px;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #050706;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 24px rgba(134, 239, 172, 0.22);
+    overflow: hidden;
+    cursor: pointer;
+    transition:
+      width 0.56s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.4s ease,
+      transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .morph-pill:not(.expanded):hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 32px rgba(134, 239, 172, 0.38);
+  }
+
+  .morph-pill.expanded {
+    width: min(640px, 92vw);
+    cursor: default;
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.6), 0 0 32px rgba(110, 231, 183, 0.3);
+  }
+
+  .pill-closed-face {
+    position: absolute;
+    inset: 0;
+    padding: 0 8px 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+      opacity 0.22s ease,
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .morph-pill.expanded .pill-closed-face {
+    opacity: 0;
+    transform: translateX(-14px);
+    pointer-events: none;
+  }
+
+  .pill-closed-face .circle-arrow {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #050706;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    transition: transform 0.25s;
+  }
+
+  .morph-pill:not(.expanded):hover .circle-arrow {
+    transform: translateX(2px);
+  }
+
+  .pill-open-face {
+    position: absolute;
+    inset: 0;
+    padding: 0 8px 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transform: translateX(14px);
+    pointer-events: none;
+    transition:
+      opacity 0.28s ease 0.14s,
+      transform 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+  }
+
+  .morph-pill.expanded .pill-open-face {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .pill-open-face svg {
+    width: 17px;
+    height: 17px;
+    color: #52525b;
+    flex-shrink: 0;
+  }
+
+  .pill-open-face input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #050706;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .pill-open-face input::placeholder {
+    color: #71717a;
+    font-weight: 400;
+  }
+
+  .close-search-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: #050706;
+    color: #ffffff;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: transform 0.25s, background 0.2s;
+  }
+
+  .close-search-btn:hover {
+    background: #10b981;
+    color: #040605;
+    transform: rotate(90deg);
+  }
+
+  .filter-drawer {
+    width: min(680px, 94vw);
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-6px);
+    transition:
+      height 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.35s ease,
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .filter-drawer.open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .filter-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding-top: 12px;
+    padding-bottom: 4px;
+  }
+
+  .filter-chip {
+    padding: 5px 13px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: rgba(12, 18, 15, 0.82);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.72);
+    transition: all 0.2s;
+  }
+
+  .filter-chip:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+  }
+
+  .filter-chip.active {
+    background: #6ee7b7;
+    color: #040605;
+    border-color: #6ee7b7;
+    font-weight: 600;
+  }
+
+  /* ================= 4. 滑动卡牌舞台 ================= */
+  .carousel-viewport {
+    position: relative;
+    width: 100%;
+    height: 460px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: grab;
+  }
+
+  .carousel-viewport:active {
+    cursor: grabbing;
+  }
+
+  #speed-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .edge-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      #040605 0%,
+      rgba(4, 6, 5, 0.78) 9%,
+      rgba(4, 6, 5, 0) 25%,
+      rgba(4, 6, 5, 0) 75%,
+      rgba(4, 6, 5, 0.78) 91%,
+      #040605 100%
+    );
+  }
+
+  .cards-stage-inner {
+    position: relative;
+    width: 100%;
+    height: 430px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1400px;
+  }
+
+  .event-card {
+    position: absolute;
+    width: 282px;
+    height: 412px;
+    border-radius: 26px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 28px 65px rgba(0, 0, 0, 0.85);
+    clip-path: path("M 0,24 C 70,2 140,32 282,12 L 282,394 C 212,412 140,384 0,402 Z");
+    will-change: transform, opacity, filter;
+    transition: box-shadow 0.35s, border-color 0.35s;
+  }
+
+  .event-card.selected-card {
+    box-shadow:
+      0 32px 75px rgba(0, 0, 0, 0.9),
+      0 0 46px rgba(110, 231, 183, 0.42);
+  }
+
+  .event-card[data-theme="emerald"] {
+    background:
+      radial-gradient(circle at 72% 24%, rgba(52, 211, 153, 0.52) 0%, transparent 56%),
+      radial-gradient(circle at 20% 78%, rgba(6, 78, 59, 0.88) 0%, transparent 66%),
+      linear-gradient(160deg, #0d2b1e 0%, #050a08 100%);
+  }
+
+  .event-card[data-theme="amber"] {
+    background:
+      radial-gradient(circle at 68% 26%, rgba(245, 158, 11, 0.48) 0%, transparent 56%),
+      radial-gradient(circle at 22% 78%, rgba(16, 185, 129, 0.34) 0%, transparent 66%),
+      linear-gradient(160deg, #291b0b 0%, #060908 100%);
+  }
+
+  .event-card[data-theme="crimson"] {
+    background:
+      radial-gradient(circle at 70% 24%, rgba(244, 63, 94, 0.46) 0%, transparent 56%),
+      radial-gradient(circle at 22% 78%, rgba(16, 185, 129, 0.32) 0%, transparent 66%),
+      linear-gradient(160deg, #260d15 0%, #060908 100%);
+  }
+
+  .event-card[data-theme="cyan"] {
+    background:
+      radial-gradient(circle at 70% 24%, rgba(34, 211, 238, 0.44) 0%, transparent 56%),
+      radial-gradient(circle at 22% 78%, rgba(16, 185, 129, 0.42) 0%, transparent 66%),
+      linear-gradient(160deg, #0b242b 0%, #050908 100%);
+  }
+
+  .event-card[data-theme="violet"] {
+    background:
+      radial-gradient(circle at 70% 24%, rgba(168, 85, 247, 0.44) 0%, transparent 56%),
+      radial-gradient(circle at 22% 78%, rgba(16, 185, 129, 0.35) 0%, transparent 66%),
+      linear-gradient(160deg, #1b0f29 0%, #060908 100%);
+  }
+
+  .card-halftone {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+    background-size: 6px 6px;
+    mask-image: radial-gradient(circle at 60% 36%, black 18%, transparent 72%);
+    -webkit-mask-image: radial-gradient(circle at 60% 36%, black 18%, transparent 72%);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .event-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 26px;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.28);
+    pointer-events: none;
+  }
+
+  .card-top {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 6px;
+  }
+
+  .card-brand-mini {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .card-brand-mini i {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #040605;
+    font-style: normal;
+    font-weight: 800;
+    font-size: 0.62rem;
+    display: grid;
+    place-items: center;
+  }
+
+  .card-badges {
+    display: flex;
+    gap: 5px;
+  }
+
+  .badge-tag {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.48);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .badge-tag.status-ended {
+    background: rgba(244, 63, 94, 0.24);
+    border-color: rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+  }
+
+  .badge-tag.status-live {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(110, 231, 183, 0.5);
+    color: #6ee7b7;
+  }
+
+  .badge-tag.status-resale {
+    background: rgba(245, 158, 11, 0.24);
+    border-color: rgba(251, 191, 36, 0.48);
+    color: #fcd34d;
+  }
+
+  .card-mid {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    margin-bottom: 12px;
+  }
+
+  .event-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.74);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin-bottom: 5px;
+  }
+
+  .event-title {
+    font-size: 1.38rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    line-height: 1.18;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+  }
+
+  .event-venue-sub {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 3px;
+  }
+
+  .card-bottom-panel {
+    position: relative;
+    z-index: 2;
+    background: rgba(6, 10, 8, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 11px 13px;
+    margin-bottom: 6px;
+  }
+
+  .sold-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: rgba(255, 255, 255, 0.62);
+    margin-bottom: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #34d399, #a7f3d0);
+  }
+
+  .price-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .price-val {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .left-count {
+    font-size: 0.66rem;
+    color: #86efac;
+    margin-top: 1px;
+  }
+
+  .btn-ticket {
+    background: #ffffff;
+    color: #040605;
+    border: none;
+    padding: 7px 13px;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+  }
+
+  .btn-ticket:hover {
+    background: #86efac;
+    transform: translateX(2px);
+  }
+
+  /* ================= 5. 小巧分段式胶囊指示条 ================= */
+  .segment-bar-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    min-height: 8px;
+    z-index: 20;
+  }
+
+  .segment-pill {
+    width: 22px;
+    height: 4px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(255, 255, 255, 0.18);
+    cursor: pointer;
+    padding: 0;
+    transition:
+      width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 0.35s ease,
+      box-shadow 0.35s ease;
+  }
+
+  .segment-pill:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.38);
+  }
+
+  .segment-pill.active {
+    width: 42px;
+    background: #7cf3c4;
+    box-shadow: 0 0 10px rgba(124, 243, 196, 0.5);
+  }
+
+  /* ================= 6. 物理高度平滑滑开/收起详情面板 ================= */
+  .detail-drawer-outer {
+    width: 100%;
+    max-width: 1040px;
+    padding: 0 32px;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-14px);
+    z-index: 20;
+    will-change: height, opacity, transform;
+    transition:
+      height 0.68s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .detail-drawer-outer.open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .detail-drawer-inner {
+    padding-top: 40px;
+    padding-bottom: 12px;
+  }
+
+  .detail-content-stage {
+    transition:
+      opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.3s ease;
+  }
+
+  .detail-content-stage.swapping {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+
+  .detail-hero-card {
+    border-radius: 22px;
+    overflow: hidden;
+    background: rgba(10, 15, 13, 0.82);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.75);
+    margin-bottom: 34px;
+  }
+
+  .detail-banner {
+    position: relative;
+    min-height: 230px;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background:
+      radial-gradient(circle at 75% 30%, rgba(52, 211, 153, 0.32) 0%, transparent 55%),
+      linear-gradient(135deg, #11241c 0%, #09110e 55%, #060908 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .detail-banner[data-theme="amber"] {
+    background:
+      radial-gradient(circle at 75% 30%, rgba(245, 158, 11, 0.3) 0%, transparent 55%),
+      linear-gradient(135deg, #241b10 0%, #0e110f 55%, #060908 100%);
+  }
+
+  .detail-banner[data-theme="crimson"] {
+    background:
+      radial-gradient(circle at 75% 30%, rgba(244, 63, 94, 0.28) 0%, transparent 55%),
+      linear-gradient(135deg, #241016 0%, #0e110f 55%, #060908 100%);
+  }
+
+  .detail-banner[data-theme="cyan"] {
+    background:
+      radial-gradient(circle at 75% 30%, rgba(34, 211, 238, 0.28) 0%, transparent 55%),
+      linear-gradient(135deg, #0e2228 0%, #09110e 55%, #060908 100%);
+  }
+
+  .detail-banner[data-theme="violet"] {
+    background:
+      radial-gradient(circle at 75% 30%, rgba(168, 85, 247, 0.28) 0%, transparent 55%),
+      linear-gradient(135deg, #1c1028 0%, #09110e 55%, #060908 100%);
+  }
+
+  .detail-close-btn {
+    position: absolute;
+    top: 22px;
+    right: 24px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .detail-close-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  .detail-cat-pill {
+    display: inline-block;
+    width: fit-content;
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.18);
+    border: 1px solid rgba(110, 231, 183, 0.38);
+    color: #86efac;
+    font-size: 0.76rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .detail-title {
+    font-size: clamp(2rem, 3.6vw, 2.9rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    margin-bottom: 14px;
+  }
+
+  .detail-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 0.84rem;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .detail-organizer-bar {
+    padding: 22px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: rgba(14, 20, 17, 0.7);
+  }
+
+  .org-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .org-summary {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .org-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .org-meta strong {
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .royalty-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #86efac;
+  }
+
+  .btn-contracts {
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.88);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-contracts:hover {
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    background: rgba(110, 231, 183, 0.08);
+  }
+
+  .contract-info-box {
+    display: none;
+    padding: 14px 32px;
+    background: rgba(4, 7, 6, 0.9);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.65);
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .contract-info-box.show {
+    display: flex;
+  }
+
+  .passes-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .passes-header h3 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .passes-header span {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .passes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .pass-ticket-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    background: rgba(12, 18, 15, 0.78);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.25s, transform 0.25s;
+  }
+
+  .pass-ticket-row:hover {
+    border-color: rgba(110, 231, 183, 0.35);
+    transform: translateY(-2px);
+  }
+
+  .pass-left {
+    padding: 24px 28px;
+  }
+
+  .pass-tier-name {
+    font-size: 1.22rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+
+  .pass-sub-info {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .pass-sub-info .rem-green {
+    color: #6ee7b7;
+    font-weight: 600;
+  }
+
+  .pass-right {
+    position: relative;
+    padding: 24px 32px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.16);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    min-width: 220px;
+  }
+
+  .pass-right::before,
+  .pass-right::after {
+    content: "";
+    position: absolute;
+    left: -9px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #040605;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .pass-right::before { top: -9px; }
+  .pass-right::after  { bottom: -9px; }
+
+  .pass-price {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.38rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .btn-buy-pass {
+    padding: 10px 22px;
+    border-radius: 9px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-buy-pass:hover {
+    background: #a7f3d0;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.35);
+  }
+
+  .btn-buy-pass.disabled {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.45);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .empty-msg {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.92rem;
+    z-index: 10;
+  }
+
+  /* ================= 7. 毛玻璃钱包选择 & Loading 弹窗（与 Home 完全一致） ================= */
+  .wallet-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(2, 4, 3, 0.68);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .wallet-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(
+      160deg,
+      rgba(22, 34, 28, 0.78) 0%,
+      rgba(9, 13, 11, 0.88) 100%
+    );
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(134, 239, 172, 0.26);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.85),
+      0 0 50px rgba(52, 211, 153, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transform: translateY(16px) scale(0.96);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-modal-backdrop.open .wallet-modal-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: 22px;
+    right: 22px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s;
+  }
+
+  .modal-close-x:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    transform: rotate(90deg);
+  }
+
+  .modal-view {
+    animation: modalFadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .modal-view.hidden {
+    display: none;
+  }
+
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+
+  .modal-sub {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.56);
+    margin-bottom: 24px;
+  }
+
+  .wallet-option-btn {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .wallet-option-btn:hover {
+    background: rgba(110, 231, 183, 0.12);
+    border-color: rgba(110, 231, 183, 0.48);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), 0 0 24px rgba(110, 231, 183, 0.16);
+  }
+
+  .wallet-option-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .okx-logo-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 7px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 1.5px;
+    flex-shrink: 0;
+  }
+
+  .okx-logo-badge span {
+    background: #ffffff;
+    border-radius: 1px;
+  }
+
+  .okx-logo-badge span.empty {
+    background: transparent;
+  }
+
+  .wallet-option-name {
+    font-size: 0.98rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+  }
+
+  .wallet-option-status {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    transition: color 0.2s;
+  }
+
+  .wallet-option-btn:hover .wallet-option-status {
+    color: #86efac;
+  }
+
+  .loading-view-box {
+    padding: 6px 2px;
+  }
+
+  .loading-view-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 18px;
+  }
+
+  .loading-status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .account-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinLoader 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spinLoader {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 820px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills { display: none; }
+    .pass-ticket-row { grid-template-columns: 1fr; }
+    .pass-right {
+      border-left: none;
+      border-top: 1px dashed rgba(255, 255, 255, 0.16);
+      align-items: flex-start;
+    }
+    .pass-right::before, .pass-right::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. 与 Home 完全一致的背景与星尘波浪层 -->
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 2. 与 Home 完全一致的 Header -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="homepage.html">Home</a>
+      <a href="marketplace.html" class="active">Marketplace</a>
+      <a href="my_ticket.html">My Tickets</a>
+    </nav>
+  </div>
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+    <button class="btn-connect" id="headerConnectBtn">Connect Wallet →</button>
+  </div>
+</header>
+
+<main class="marketplace-shell">
+  <!-- 3. 上方文案与原位水平扩展 Search Bar -->
+  <section class="hero-top">
+    <div class="kicker-pill">Primary &amp; Verified Secondary Market · <span>Zero Scalper Markup</span></div>
+    <h1>Explore Live Shows</h1>
+    <div class="subtitle">Curated Experiences Verified On-Chain</div>
+    <p class="hero-desc">
+      Discover upcoming concerts, underground club nights, and global festivals. Click any card below to inspect smart contract terms, admission tiers, and live resale availability.
+    </p>
+
+    <div class="search-morph-area">
+      <!-- 单一白色胶囊容器：点击后原位向两侧平滑拉伸扩展 -->
+      <div class="morph-pill" id="morphPill">
+        <div class="pill-closed-face" id="pillClosedFace">
+          <span>Search shows &amp; filter</span>
+          <span class="circle-arrow">→</span>
+        </div>
+
+        <div class="pill-open-face">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Search by artist, show name, venue or city...">
+          <button class="close-search-btn" id="closeSearchBtn" title="Close search">✕</button>
+        </div>
+      </div>
+
+      <!-- 扩展后下方顺滑滑出的过滤标签行 -->
+      <div class="filter-drawer" id="filterDrawer">
+        <div class="filter-strip" id="filterStrip">
+          <button class="filter-chip active" data-type="cat" data-val="All">All Categories</button>
+          <button class="filter-chip" data-type="cat" data-val="Concert">Concert</button>
+          <button class="filter-chip" data-type="cat" data-val="Festival">Festival</button>
+          <button class="filter-chip" data-type="cat" data-val="Club">Club</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 滑动卡牌舞台 -->
+  <section class="carousel-viewport" id="carouselViewport">
+    <canvas id="speed-canvas"></canvas>
+    <div class="edge-vignette"></div>
+    <div class="cards-stage-inner" id="cardsStage"></div>
+  </section>
+
+  <!-- 小巧精致的分段式薄荷绿胶囊指示条 -->
+  <div class="segment-bar-wrap" id="segmentBar"></div>
+
+  <!-- 5. 点击卡片后物理高度平滑滑下展开的活动详情区 -->
+  <section class="detail-drawer-outer" id="detailOuter">
+    <div class="detail-drawer-inner" id="detailInner"></div>
+  </section>
+</main>
+
+<!-- 6. 毛玻璃钱包选择 & Loading 弹窗（与 Home 完全一致） -->
+<div class="wallet-modal-backdrop" id="walletModal">
+  <div class="wallet-modal-card" role="dialog" aria-modal="true" aria-labelledby="walletModalTitle">
+    <button class="modal-close-x" id="closeModalBtn" title="Close">✕</button>
+
+    <!-- 视图 1：选择钱包 -->
+    <div class="modal-view" id="walletSelectView">
+      <h3 class="modal-title" id="walletModalTitle">Choose a wallet</h3>
+      <p class="modal-sub">Pick one to sign in. You can browse shows without it.</p>
+
+      <button class="wallet-option-btn" id="okxWalletBtn" type="button">
+        <div class="wallet-option-left">
+          <div class="okx-logo-badge">
+            <span></span><span class="empty"></span><span></span>
+            <span class="empty"></span><span></span><span class="empty"></span>
+            <span></span><span class="empty"></span><span></span>
+          </div>
+          <span class="wallet-option-name">OKX Wallet</span>
+        </div>
+        <span class="wallet-option-status">Connect →</span>
+      </button>
+    </div>
+
+    <!-- 视图 2：Loading your account -->
+    <div class="modal-view hidden loading-view-box" id="walletLoadingView">
+      <h3 class="loading-view-title">Loading your account</h3>
+      <div class="loading-status-row">
+        <span class="account-spinner"></span>
+        <span>Loading your account...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ================= 1. 原位水平扩展 Search Bar 交互 ================= */
+  const morphPill = document.getElementById("morphPill");
+  const filterDrawer = document.getElementById("filterDrawer");
+  const filterStrip = document.getElementById("filterStrip");
+  const closeSearchBtn = document.getElementById("closeSearchBtn");
+  const searchInput = document.getElementById("searchInput");
+
+  let isSearchExpanded = false;
+
+  morphPill.addEventListener("click", (e) => {
+    if (isSearchExpanded) return;
+    isSearchExpanded = true;
+    morphPill.classList.add("expanded");
+
+    filterDrawer.style.height = filterStrip.scrollHeight + "px";
+    filterDrawer.classList.add("open");
+    setTimeout(() => {
+      if (isSearchExpanded) filterDrawer.style.height = "auto";
+    }, 450);
+
+    setTimeout(() => searchInput.focus(), 180);
+  });
+
+  closeSearchBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!isSearchExpanded) return;
+    isSearchExpanded = false;
+
+    filterDrawer.style.height = filterDrawer.offsetHeight + "px";
+    filterDrawer.offsetHeight;
+    filterDrawer.classList.remove("open");
+    filterDrawer.style.height = "0px";
+
+    morphPill.classList.remove("expanded");
+
+    if (searchInput.value !== "") {
+      searchInput.value = "";
+      filterState.query = "";
+      rebuildCarousel();
+    }
+  });
+
+  /* ================= 2. 完整活动数据 ================= */
+  const allEvents = [
+    {
+      id: 1,
+      title: "Nebula Synth Live",
+      artist: "Kaito & The Holograms",
+      summary: "An immersive audiovisual synthesizer performance powered by verifiable on-chain passes.",
+      organizer: "Nebula Audio Labs",
+      royalty: "10.0%",
+      contractAddr: "0x84fA...91E2",
+      category: "Concert",
+      status: "available",
+      statusLabel: "On Sale",
+      date: "NOV 28 · 08:00 PM",
+      fullDate: "Sat, Nov 28, 2026",
+      timeRange: "08:00 PM - 11:30 PM",
+      venue: "Arena 04 · Tokyo",
+      sold: 84,
+      total: 120,
+      price: "24.50 xDAI",
+      theme: "emerald",
+      tiers: [
+        { name: "General Admission", remaining: 36, price: "24.50 xDAI", resalePrice: "24.50 xDAI" },
+        { name: "VIP Backstage Pass", remaining: 8, price: "68.00 xDAI", resalePrice: "72.00 xDAI" }
+      ]
+    },
+    {
+      id: 2,
+      title: "Test 2",
+      artist: "Test 2",
+      summary: "Test 2",
+      organizer: "Demo Organizer",
+      royalty: "10.0%",
+      contractAddr: "0x3cB9...40A7",
+      category: "Concert",
+      status: "ended",
+      statusLabel: "Ended",
+      date: "NOV 20 · 12:46 PM",
+      fullDate: "Fri, Nov 20, 2026",
+      timeRange: "12:46 PM - 5:16 PM",
+      venue: "115",
+      sold: 0,
+      total: 12,
+      price: "11.00 xDAI",
+      theme: "amber",
+      tiers: [
+        { name: "General Admission", remaining: 12, price: "11.00 xDAI", resalePrice: "11.00 xDAI" }
+      ]
+    },
+    {
+      id: 3,
+      title: "Zero-Knowledge Rave",
+      artist: "Vitalik Beats · B2B Set",
+      summary: "Late-night electronic showcase featuring zero-knowledge gate verification and anti-scalper caps.",
+      organizer: "ZK Sound Collective",
+      royalty: "7.5%",
+      contractAddr: "0x91D4...72F8",
+      category: "Club",
+      status: "resale",
+      statusLabel: "Resale Pool",
+      date: "DEC 05 · 11:30 PM",
+      fullDate: "Sat, Dec 05, 2026",
+      timeRange: "11:30 PM - 05:00 AM",
+      venue: "Warehouse 9 · Berlin",
+      sold: 192,
+      total: 200,
+      price: "18.00 xDAI",
+      theme: "crimson",
+      tiers: [
+        { name: "Standard Entry", remaining: 8, price: "18.00 xDAI", resalePrice: "19.80 xDAI" }
+      ]
+    },
+    {
+      id: 4,
+      title: "Aurora Block Fest",
+      artist: "Modular Sound Collective",
+      summary: "Open-air harbor music & digital art festival with instant L2 ticket settlement.",
+      organizer: "Aurora Events SG",
+      royalty: "10.0%",
+      contractAddr: "0x52E1...88C3",
+      category: "Festival",
+      status: "available",
+      statusLabel: "On Sale",
+      date: "DEC 14 · 06:00 PM",
+      fullDate: "Mon, Dec 14, 2026",
+      timeRange: "06:00 PM - 11:59 PM",
+      venue: "Harbor Stage · Singapore",
+      sold: 310,
+      total: 500,
+      price: "42.00 xDAI",
+      theme: "cyan",
+      tiers: [
+        { name: "General Admission", remaining: 165, price: "42.00 xDAI", resalePrice: "42.00 xDAI" },
+        { name: "Harbor Deck VIP", remaining: 25, price: "95.00 xDAI", resalePrice: "95.00 xDAI" }
+      ]
+    },
+    {
+      id: 5,
+      title: "Cyber Soul Sessions",
+      artist: "Aether & Luna Live",
+      summary: "Intimate futuristic R&B and neo-soul live session with dynamic rotating QR passes.",
+      organizer: "Seoul Web3 Live",
+      royalty: "8.0%",
+      contractAddr: "0x77A0...19D5",
+      category: "Concert",
+      status: "available",
+      statusLabel: "On Sale",
+      date: "DEC 22 · 09:30 PM",
+      fullDate: "Tue, Dec 22, 2026",
+      timeRange: "09:30 PM - 11:45 PM",
+      venue: "Neon Hall · Seoul",
+      sold: 145,
+      total: 180,
+      price: "30.00 xDAI",
+      theme: "violet",
+      tiers: [
+        { name: "General Admission", remaining: 35, price: "30.00 xDAI", resalePrice: "30.00 xDAI" }
+      ]
+    }
+  ];
+
+  const filterState = {
+    query: "",
+    status: "all",
+    cat: "All"
+  };
+
+  let selectedEventId = null;
+
+  searchInput.addEventListener("input", (e) => {
+    filterState.query = e.target.value.trim().toLowerCase();
+    rebuildCarousel();
+  });
+
+  document.querySelectorAll("#filterStrip .filter-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const type = chip.dataset.type;
+      document.querySelectorAll(`#filterStrip .filter-chip[data-type="${type}"]`)
+        .forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      filterState[type] = chip.dataset.val;
+      rebuildCarousel();
+    });
+  });
+
+  /* ================= 3. 物理高度平滑展开 + 丝滑交叉切换详情面板 ================= */
+  const detailOuter = document.getElementById("detailOuter");
+  const detailInner = document.getElementById("detailInner");
+  let isDetailOpen = false;
+  let closeTimer = null;
+  let swapTimer = null;
+  let heightSettleTimer = null;
+
+  function smoothScrollToY(targetY, duration = 680) {
+    const startY = window.scrollY;
+    const diff = targetY - startY;
+    if (Math.abs(diff) < 4) return;
+    let startTime = null;
+
+    function step(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 4);
+      window.scrollTo(0, startY + diff * ease);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function buildDetailInnerHTML(item) {
+    const tiersHtml = item.tiers.map(tier => `
+      <div class="pass-ticket-row">
+        <div class="pass-left">
+          <div class="pass-tier-name">${tier.name}</div>
+          <div class="pass-sub-info">
+            <span class="rem-green">${tier.remaining} remaining</span> · Resale: ${tier.resalePrice}
+          </div>
+        </div>
+        <div class="pass-right">
+          <div class="pass-price">${tier.price}</div>
+          <button class="btn-buy-pass ${item.status === 'ended' ? 'disabled' : ''}"
+            onclick="${item.status === 'ended' ? "alert('This event has ended.')" : 'window.WalletModal && window.WalletModal.open()'}">
+            Connect to Buy
+          </button>
+        </div>
+      </div>
+    `).join("");
+
+    return `
+      <div class="detail-content-stage" id="detailContentStage">
+        <div class="detail-hero-card">
+          <div class="detail-banner" data-theme="${item.theme}">
+            <button class="detail-close-btn" id="closeDetailBtn">✕ Close Details</button>
+            <span class="detail-cat-pill">${item.category}</span>
+            <h2 class="detail-title">${item.title}</h2>
+            <div class="detail-meta-row">
+              <span>📅 ${item.fullDate}</span>
+              <span>·</span>
+              <span>🕒 ${item.timeRange}</span>
+              <span>·</span>
+              <span>📍 ${item.venue}</span>
+            </div>
+          </div>
+
+          <div class="detail-organizer-bar">
+            <div class="org-left">
+              <div class="org-summary">${item.summary}</div>
+              <div class="org-meta">
+                <span>Organized by <strong>${item.organizer}</strong></span>
+                <span>·</span>
+                <span class="royalty-tag">🛡 Resale Creator Royalty: ${item.royalty}</span>
+              </div>
+            </div>
+            <button class="btn-contracts" id="toggleContractsBtn">▶ On-Chain Contracts</button>
+          </div>
+
+          <div class="contract-info-box" id="contractInfoBox">
+            <span>Ticket NFT (ERC-721): <strong style="color:#86efac;">${item.contractAddr}</strong></span>
+            <span>Resale Pool Escrow: <strong style="color:#86efac;">0x49B2...c10F</strong></span>
+            <span>Chain: <strong style="color:#ffffff;">Gnosis / xDAI L2</strong></span>
+          </div>
+        </div>
+
+        <div class="passes-header">
+          <h3>Admission Passes</h3>
+          <span>${item.tiers.length} Tier${item.tiers.length > 1 ? "s" : ""}</span>
+        </div>
+
+        <div class="passes-list">
+          ${tiersHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindDetailEvents() {
+    const closeBtn = document.getElementById("closeDetailBtn");
+    if (closeBtn) closeBtn.addEventListener("click", closeEventDetail);
+
+    const toggleBtn = document.getElementById("toggleContractsBtn");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", (e) => {
+        const box = document.getElementById("contractInfoBox");
+        const shown = box.classList.toggle("show");
+        e.target.textContent = shown ? "▼ On-Chain Contracts" : "▶ On-Chain Contracts";
+      });
+    }
+  }
+
+  function openEventDetail(item, shouldScroll = true) {
+    clearTimeout(closeTimer);
+    clearTimeout(swapTimer);
+    clearTimeout(heightSettleTimer);
+
+    const isDifferentEvent = selectedEventId !== item.id;
+    selectedEventId = item.id;
+
+    if (isDetailOpen && isDifferentEvent) {
+      const prevH = detailOuter.offsetHeight;
+      detailOuter.style.height = prevH + "px";
+
+      const oldStage = document.getElementById("detailContentStage");
+      if (oldStage) oldStage.classList.add("swapping");
+
+      swapTimer = setTimeout(() => {
+        detailInner.innerHTML = buildDetailInnerHTML(item);
+        bindDetailEvents();
+
+        const newStage = document.getElementById("detailContentStage");
+        if (newStage) {
+          newStage.classList.add("swapping");
+          newStage.offsetHeight;
+          requestAnimationFrame(() => {
+            newStage.classList.remove("swapping");
+          });
+        }
+
+        const nextH = detailInner.scrollHeight;
+        detailOuter.style.height = nextH + "px";
+
+        heightSettleTimer = setTimeout(() => {
+          if (isDetailOpen) detailOuter.style.height = "auto";
+        }, 680);
+      }, 240);
+    } else if (!isDetailOpen) {
+      isDetailOpen = true;
+      detailInner.innerHTML = buildDetailInnerHTML(item);
+      bindDetailEvents();
+
+      detailOuter.style.height = "0px";
+      detailOuter.offsetHeight;
+
+      const targetH = detailInner.scrollHeight;
+      detailOuter.classList.add("open");
+      detailOuter.style.height = targetH + "px";
+
+      heightSettleTimer = setTimeout(() => {
+        if (isDetailOpen) detailOuter.style.height = "auto";
+      }, 680);
+
+      if (shouldScroll) {
+        const rect = detailOuter.getBoundingClientRect();
+        const targetScrollY = window.scrollY + rect.top - 92;
+        smoothScrollToY(targetScrollY, 720);
+      }
+    }
+  }
+
+  function closeEventDetail() {
+    if (!isDetailOpen) return;
+    clearTimeout(swapTimer);
+    clearTimeout(heightSettleTimer);
+
+    selectedEventId = null;
+    isDetailOpen = false;
+
+    detailOuter.style.height = detailOuter.offsetHeight + "px";
+    detailOuter.offsetHeight;
+
+    detailOuter.classList.remove("open");
+    detailOuter.style.height = "0px";
+
+    closeTimer = setTimeout(() => {
+      if (!isDetailOpen) detailInner.innerHTML = "";
+    }, 680);
+  }
+
+  /* ================= 4. 智能轨道：>=3 项无限循环，1~2 项旁边留空 ================= */
+  const cardsStage = document.getElementById("cardsStage");
+  const viewport = document.getElementById("carouselViewport");
+  const segmentBar = document.getElementById("segmentBar");
+
+  let filteredList = [...allEvents];
+  let virtualSlots = [];
+  let segmentPills = [];
+  let lastActiveDataIdx = -1;
+  let isLoopMode = true;
+
+  let targetOffset = 0;
+  let currentOffset = 0;
+  let slideVelocity = 0;
+
+  function mod(n, m) {
+    return ((n % m) + m) % m;
+  }
+
+  function renderSegmentBar() {
+    segmentBar.innerHTML = "";
+    segmentPills = [];
+    if (filteredList.length <= 1) return;
+
+    filteredList.forEach((item, idx) => {
+      const pill = document.createElement("button");
+      pill.className = "segment-pill";
+      pill.title = item.title;
+      pill.addEventListener("click", () => {
+        if (isLoopMode) {
+          const curMod = mod(Math.round(targetOffset), filteredList.length);
+          let diff = idx - curMod;
+          if (diff > filteredList.length / 2) diff -= filteredList.length;
+          if (diff < -filteredList.length / 2) diff += filteredList.length;
+          targetOffset = Math.round(targetOffset) + diff;
+        } else {
+          targetOffset = idx;
+        }
+
+        if (isDetailOpen) {
+          openEventDetail(item, false);
+        }
+      });
+      segmentBar.appendChild(pill);
+      segmentPills.push(pill);
+    });
+    lastActiveDataIdx = -1;
+  }
+
+  function createCardElement() {
+    const el = document.createElement("article");
+    el.className = "event-card";
+    el.innerHTML = `
+      <div class="card-halftone"></div>
+      <div class="card-top">
+        <div class="card-brand-mini"><i>CT</i><span class="c-pass"></span></div>
+        <div class="card-badges">
+          <span class="badge-tag c-cat"></span>
+          <span class="badge-tag c-status"></span>
+        </div>
+      </div>
+      <div class="card-mid">
+        <div class="event-meta-line">
+          <span class="c-date"></span><span>·</span><span class="c-venue"></span>
+        </div>
+        <h2 class="event-title c-title"></h2>
+        <div class="event-venue-sub c-artist"></div>
+      </div>
+      <div class="card-bottom-panel">
+        <div class="sold-row"><span>Sold</span><span class="c-sold"></span></div>
+        <div class="progress-track"><div class="progress-fill c-bar"></div></div>
+        <div class="price-action-row">
+          <div>
+            <div class="price-val c-price"></div>
+            <div class="left-count c-left"></div>
+          </div>
+          <button class="btn-ticket">Tickets →</button>
+        </div>
+      </div>
+    `;
+    return el;
+  }
+
+  function populateCard(el, item, virtualIdx) {
+    el.classList.toggle("selected-card", selectedEventId === item.id);
+
+    if (el.dataset.boundId === String(item.id) && el.dataset.vIdx === String(virtualIdx)) return;
+    el.dataset.boundId = String(item.id);
+    el.dataset.vIdx = String(virtualIdx);
+    el.dataset.theme = item.theme;
+
+    const pct = item.total > 0 ? Math.round((item.sold / item.total) * 100) : 0;
+    const leftTickets = Math.max(0, item.total - item.sold);
+
+    el.querySelector(".c-pass").textContent = `Pass #0${item.id}`;
+    el.querySelector(".c-cat").textContent = item.category;
+
+    const statusEl = el.querySelector(".c-status");
+    statusEl.textContent = item.statusLabel;
+    statusEl.className = "badge-tag c-status " + (
+      item.status === "ended" ? "status-ended" :
+      item.status === "resale" ? "status-resale" : "status-live"
+    );
+
+    el.querySelector(".c-date").textContent = `📅 ${item.date}`;
+    el.querySelector(".c-venue").textContent = `📍 ${item.venue}`;
+    el.querySelector(".c-title").textContent = item.title;
+    el.querySelector(".c-artist").textContent = item.artist;
+    el.querySelector(".c-sold").textContent = `${item.sold} / ${item.total} (${pct}%)`;
+    el.querySelector(".c-bar").style.width = `${pct}%`;
+    el.querySelector(".c-price").textContent = item.price;
+    el.querySelector(".c-left").textContent = `${leftTickets} left`;
+
+    el.onclick = () => {
+      if (wasDragged) return;
+      targetOffset = virtualIdx;
+      if (selectedEventId === item.id && isDetailOpen) {
+        closeEventDetail();
+      } else {
+        openEventDetail(item, true);
+      }
+    };
+
+    el.querySelector(".btn-ticket").onclick = (e) => {
+      e.stopPropagation();
+      targetOffset = virtualIdx;
+      openEventDetail(item, true);
+    };
+  }
+
+  function rebuildCarousel() {
+    filteredList = allEvents.filter(ev => {
+      const q = filterState.query;
+      const matchQ = !q ||
+        ev.title.toLowerCase().includes(q) ||
+        ev.artist.toLowerCase().includes(q) ||
+        ev.venue.toLowerCase().includes(q);
+      const matchS = filterState.status === "all" || ev.status === filterState.status;
+      const matchC = filterState.cat === "All" || ev.category === filterState.cat;
+      return matchQ && matchS && matchC;
+    });
+
+    cardsStage.innerHTML = "";
+    virtualSlots = [];
+    renderSegmentBar();
+
+    if (filteredList.length === 0) {
+      cardsStage.innerHTML = `<div class="empty-msg">No matching shows found on-chain.</div>`;
+      closeEventDetail();
+      return;
+    }
+
+    targetOffset = 0;
+    currentOffset = 0;
+    isLoopMode = filteredList.length >= 3;
+
+    if (isLoopMode) {
+      for (let s = -3; s <= 3; s++) {
+        const el = createCardElement();
+        cardsStage.appendChild(el);
+        virtualSlots.push({ el, slotOffset: s, fixedIdx: null });
+      }
+    } else {
+      filteredList.forEach((_, idx) => {
+        const el = createCardElement();
+        cardsStage.appendChild(el);
+        virtualSlots.push({ el, slotOffset: 0, fixedIdx: idx });
+      });
+    }
+  }
+
+  function clampOffset(val) {
+    if (isLoopMode) return val;
+    const maxIdx = Math.max(0, filteredList.length - 1);
+    return Math.max(0, Math.min(maxIdx, val));
+  }
+
+  let isDragging = false;
+  let wasDragged = false;
+  let startX = 0;
+  let startOffset = 0;
+
+  viewport.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button") || filteredList.length <= 1) return;
+    isDragging = true;
+    wasDragged = false;
+    startX = e.clientX;
+    startOffset = targetOffset;
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 5) wasDragged = true;
+    const raw = startOffset - dx / 290;
+    if (isLoopMode) {
+      targetOffset = raw;
+    } else {
+      const maxIdx = Math.max(0, filteredList.length - 1);
+      targetOffset = Math.max(-0.18, Math.min(maxIdx + 0.18, raw));
+    }
+  });
+
+  window.addEventListener("pointerup", () => {
+    if (!isDragging) return;
+    isDragging = false;
+    targetOffset = clampOffset(Math.round(targetOffset));
+
+    if (isDetailOpen && filteredList.length > 0) {
+      const newIdx = isLoopMode ? mod(targetOffset, filteredList.length) : targetOffset;
+      const newItem = filteredList[newIdx];
+      if (newItem && newItem.id !== selectedEventId) {
+        openEventDetail(newItem, false);
+      }
+    }
+  });
+
+  let wheelTimeout;
+  viewport.addEventListener("wheel", (e) => {
+    if (filteredList.length <= 1) return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      e.preventDefault();
+      const raw = targetOffset + e.deltaX * 0.0032;
+      targetOffset = isLoopMode ? raw : clampOffset(raw);
+      clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        targetOffset = clampOffset(Math.round(targetOffset));
+        if (isDetailOpen && filteredList.length > 0) {
+          const newIdx = isLoopMode ? mod(targetOffset, filteredList.length) : targetOffset;
+          const newItem = filteredList[newIdx];
+          if (newItem && newItem.id !== selectedEventId) {
+            openEventDetail(newItem, false);
+          }
+        }
+      }, 130);
+    }
+  }, { passive: false });
+
+  function updateCardTransforms() {
+    if (filteredList.length === 0 || virtualSlots.length === 0) return;
+
+    const prevOffset = currentOffset;
+    currentOffset += (targetOffset - currentOffset) * 0.11;
+    slideVelocity = currentOffset - prevOffset;
+
+    const centerRound = Math.round(currentOffset);
+    const activeDataIdx = isLoopMode
+      ? mod(centerRound, filteredList.length)
+      : clampOffset(centerRound);
+
+    if (activeDataIdx !== lastActiveDataIdx) {
+      lastActiveDataIdx = activeDataIdx;
+      segmentPills.forEach((pill, idx) => {
+        pill.classList.toggle("active", idx === activeDataIdx);
+      });
+    }
+
+    const cardSpacing = 310;
+
+    virtualSlots.forEach(({ el, slotOffset, fixedIdx }) => {
+      const virtualIdx = isLoopMode ? (centerRound + slotOffset) : fixedIdx;
+      const dataIdx = isLoopMode ? mod(virtualIdx, filteredList.length) : fixedIdx;
+      const item = filteredList[dataIdx];
+
+      populateCard(el, item, virtualIdx);
+
+      const dist = virtualIdx - currentOffset;
+      const absDist = Math.abs(dist);
+
+      const x = dist * cardSpacing + Math.sign(dist) * Math.pow(absDist, 1.35) * 18;
+      const y = absDist * 10 - (absDist < 0.5 ? (1 - absDist * 2) * 10 : 0);
+      const rotY = Math.max(-28, Math.min(28, -dist * 11));
+
+      const scaleX = absDist > 1.15 ? 1 + (absDist - 1.15) * 0.28 : 1 - absDist * 0.03;
+      const scaleY = absDist > 1.15 ? Math.max(0.75, 0.96 - (absDist - 1.15) * 0.14) : 1.03 - absDist * 0.05;
+
+      const blurPx = absDist > 1.1 ? Math.min(14, (absDist - 1.1) * 9.5) : 0;
+      const opacity = absDist > 2.35 ? 0 : (absDist > 1.1 ? Math.max(0.12, 1 - (absDist - 1.1) * 0.68) : 1);
+
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) rotateY(${rotY}deg) scale(${scaleX}, ${scaleY})`;
+      el.style.filter = blurPx > 0.1 ? `blur(${blurPx.toFixed(1)}px)` : "none";
+      el.style.opacity = opacity.toFixed(2);
+      el.style.zIndex = Math.round(20 - absDist * 5);
+      el.style.pointerEvents = absDist > 1.6 ? "none" : "auto";
+    });
+  }
+
+  rebuildCarousel();
+
+  /* ================= 5. 丝滑惯性残影型高速流光 ================= */
+  const speedCanvas = document.getElementById("speed-canvas");
+  const sCtx = speedCanvas.getContext("2d");
+  let sWidth, sHeight, sDpr;
+
+  function resizeSpeedCanvas() {
+    sDpr = Math.min(window.devicePixelRatio || 1, 2);
+    sWidth = viewport.clientWidth;
+    sHeight = viewport.clientHeight;
+    speedCanvas.width = sWidth * sDpr;
+    speedCanvas.height = sHeight * sDpr;
+    sCtx.setTransform(sDpr, 0, 0, sDpr, 0, 0);
+  }
+  window.addEventListener("resize", resizeSpeedCanvas);
+  resizeSpeedCanvas();
+
+  const streakPalette = [
+    { r: 110, g: 231, b: 183 },
+    { r: 52,  g: 211, b: 153 },
+    { r: 251, g: 191, b: 36  },
+    { r: 56,  g: 189, b: 248 },
+    { r: 244, g: 114, b: 182 }
+  ];
+
+  const streaks = Array.from({ length: 38 }, () => {
+    const col = streakPalette[Math.floor(Math.random() * streakPalette.length)];
+    const depth = Math.random();
+    return {
+      x: Math.random() * sWidth,
+      y: sHeight * (0.2 + Math.random() * 0.6),
+      baseLen: 140 + depth * 280,
+      thickness: 2 + depth * 14,
+      alpha: 0.08 + depth * 0.24,
+      color: col,
+      depth
+    };
+  });
+
+  let smoothVel = 0;
+  let smoothEnergy = 0;
+
+  function renderSpeedStreaks() {
+    sCtx.clearRect(0, 0, sWidth, sHeight);
+
+    smoothVel += (slideVelocity - smoothVel) * 0.16;
+
+    const targetEnergy = Math.min(1, Math.abs(smoothVel) * 26);
+    const lerpRate = targetEnergy > smoothEnergy ? 0.14 : 0.055;
+    smoothEnergy += (targetEnergy - smoothEnergy) * lerpRate;
+
+    if (smoothEnergy < 0.006) return;
+
+    sCtx.globalCompositeOperation = "lighter";
+    const directionalPush = -smoothVel * 360;
+
+    streaks.forEach(st => {
+      st.x += directionalPush * (0.4 + st.depth * 0.8);
+
+      const dynamicLen = st.baseLen * (0.5 + smoothEnergy * 1.6);
+
+      if (st.x - dynamicLen > sWidth + 140) {
+        st.x = -dynamicLen - 80;
+      } else if (st.x + dynamicLen < -140) {
+        st.x = sWidth + dynamicLen + 80;
+      }
+
+      const x0 = st.x - dynamicLen * 0.5;
+      const x1 = st.x + dynamicLen * 0.5;
+      const easedAlpha = st.alpha * (smoothEnergy * smoothEnergy);
+
+      const { r, g, b } = st.color;
+
+      const haloGrad = sCtx.createLinearGradient(x0, st.y, x1, st.y);
+      haloGrad.addColorStop(0.0, `rgba(${r}, ${g}, ${b}, 0)`);
+      haloGrad.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, ${easedAlpha * 0.35})`);
+      haloGrad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${easedAlpha * 0.55})`);
+      haloGrad.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, ${easedAlpha * 0.35})`);
+      haloGrad.addColorStop(1.0, `rgba(${r}, ${g}, ${b}, 0)`);
+
+      sCtx.fillStyle = haloGrad;
+      sCtx.beginPath();
+      sCtx.roundRect(x0, st.y - st.thickness, dynamicLen, st.thickness * 2, st.thickness);
+      sCtx.fill();
+
+      const coreGrad = sCtx.createLinearGradient(x0 + dynamicLen * 0.15, st.y, x1 - dynamicLen * 0.15, st.y);
+      coreGrad.addColorStop(0.0, `rgba(${r}, ${g}, ${b}, 0)`);
+      coreGrad.addColorStop(0.5, `rgba(255, 255, 255, ${easedAlpha * 0.65})`);
+      coreGrad.addColorStop(1.0, `rgba(${r}, ${g}, ${b}, 0)`);
+
+      sCtx.fillStyle = coreGrad;
+      sCtx.beginPath();
+      sCtx.roundRect(x0 + dynamicLen * 0.15, st.y - st.thickness * 0.22, dynamicLen * 0.7, st.thickness * 0.44, st.thickness * 0.22);
+      sCtx.fill();
+    });
+
+    sCtx.globalCompositeOperation = "source-over";
+  }
+
+  /* ================= 6. 100% 复用 Home 全局拓扑波浪与星尘背景 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 85 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.5,
+    alpha: 0.15 + Math.random() * 0.45,
+    vy: -(0.08 + Math.random() * 0.2),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 26;
+  const RIBBON_SEGS = 100;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (smoothMouse.x > -500) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 220 && dist > 0.1) {
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = (0.02 + centerGlow * 0.065);
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+
+  function animate() {
+    time += 0.015;
+
+    updateCardTransforms();
+    renderSpeedStreaks();
+
+    ctx.clearRect(0, 0, width, height);
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (smoothMouse.x > -500) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 180 && dist > 0.1) {
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a})`
+        : `rgba(255, 255, 255, ${a * 0.8})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+
+  /* ================= 7. 毛玻璃钱包选择 & Loading 弹窗逻辑（与 Home 一致） ================= */
+  (() => {
+    const connectBtn = document.getElementById("headerConnectBtn");
+    const walletModal = document.getElementById("walletModal");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const okxWalletBtn = document.getElementById("okxWalletBtn");
+    const walletSelectView = document.getElementById("walletSelectView");
+    const walletLoadingView = document.getElementById("walletLoadingView");
+
+    function showSelectView() {
+      walletLoadingView.classList.add("hidden");
+      walletSelectView.classList.remove("hidden");
+      closeModalBtn.style.display = "grid";
+    }
+
+    function showLoadingView() {
+      walletSelectView.classList.add("hidden");
+      walletLoadingView.classList.remove("hidden");
+      closeModalBtn.style.display = "none";
+    }
+
+    function openWalletModal() {
+      showSelectView();
+      walletModal.classList.add("open");
+    }
+
+    function closeWalletModal() {
+      walletModal.classList.remove("open");
+      setTimeout(showSelectView, 300);
+    }
+
+    window.WalletModal = {
+      open: openWalletModal,
+      close: closeWalletModal,
+      showLoading: showLoadingView,
+      reset: showSelectView
+    };
+
+    if (connectBtn) connectBtn.addEventListener("click", openWalletModal);
+    if (closeModalBtn) closeModalBtn.addEventListener("click", closeWalletModal);
+
+    walletModal.addEventListener("click", (e) => {
+      if (e.target === walletModal && !walletSelectView.classList.contains("hidden")) {
+        closeWalletModal();
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !walletSelectView.classList.contains("hidden")) {
+        closeWalletModal();
+      }
+    });
+
+    okxWalletBtn.addEventListener("click", async () => {
+      showLoadingView();
+      if (window.okxwallet) {
+        try {
+          await window.okxwallet.request({ method: "eth_requestAccounts" });
+          closeWalletModal();
+        } catch (err) {
+          showSelectView();
+        }
+      }
+    });
+  })();
+</script>
+</body>
+</html>

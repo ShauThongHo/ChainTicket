@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket</title>
+<link rel="stylesheet" href="css/homepage.css">
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="homepage.html" class="active">Home</a>
+      <a href="marketplace.html">Marketplace</a>
+      <a href="my_ticket.html">My Tickets</a>
+    </nav>
+  </div>
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+    <button class="btn-connect" id="headerConnectBtn">Connect Wallet →</button>
+  </div>
+</header>
+
+<main class="hero-main">
+  <div class="hero-left">
+    <div class="kicker-row">
+      Your Ticket, Your <span class="kicker-badge">On-Chain Proof</span>
+    </div>
+    <h1>
+      Shows worth<br>
+      <span>showing up for.</span>
+    </h1>
+    <p class="hero-desc">
+      Mint, transfer, and verify event passes with zero scalper bots and instant cryptographic authenticity at every gate.
+    </p>
+
+    <div class="trust-strip">
+      <div class="trust-item"><i>✓</i> Anti-Scalp Cap</div>
+      <div class="trust-item"><i>✓</i> 1-Wallet-1-Ticket</div>
+      <div class="trust-item"><i>✓</i> Dynamic QR</div>
+    </div>
+
+    <div class="cta-buttons">
+      <a href="marketplace.html" class="btn-primary">Explore Events →</a>
+    </div>
+
+    <div class="metrics-row">
+      <div>
+        <div class="metric-val">1.48M+</div>
+        <div class="metric-label">Passes Minted</div>
+      </div>
+      <div>
+        <div class="metric-val">0.00%</div>
+        <div class="metric-label">Counterfeit Rate</div>
+      </div>
+      <div>
+        <div class="metric-val">&lt; 180ms</div>
+        <div class="metric-label">Gate Verification</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="holo-ticket" id="holoTicket">
+      <div class="ticket-banner">
+        <div class="banner-top">
+          <span class="pass-id">NFT PASS #0419</span>
+          <span class="chain-pill">VERIFIED</span>
+        </div>
+        <div>
+          <div class="event-name">NEBULA SYNTH FESTIVAL</div>
+          <div class="event-loc">Tokyo Dome · Nov 28, 2026</div>
+        </div>
+      </div>
+
+      <div class="ticket-body">
+        <div class="info-grid">
+          <div>
+            <div class="info-label">ACCESS TIER</div>
+            <div class="info-value">ALL-ACCESS VIP</div>
+          </div>
+          <div>
+            <div class="info-label">SEAT / ZONE</div>
+            <div class="info-value">SEC A · ROW 02</div>
+          </div>
+          <div>
+            <div class="info-label">OWNER</div>
+            <div class="info-value">0x71C...89A4</div>
+          </div>
+          <div>
+            <div class="info-label">RESALE CAP</div>
+            <div class="info-value">110% MAX</div>
+          </div>
+        </div>
+
+        <div class="ticket-tear"></div>
+
+        <div class="ticket-footer">
+          <div class="qr-mini">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+          </div>
+          <div class="verify-status">
+            <div class="verify-hash">TX: 0x94e8...f31c</div>
+            <div class="verify-ok">● Ready for Gate Scan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="bottom-dock">
+  <div class="chains-supported">
+    <span>Supported Networks</span>
+    <div class="chain-tags">
+      <span>Ethereum</span>
+      <span>Solana</span>
+      <span>Base</span>
+      <span>Polygon</span>
+    </div>
+  </div>
+
+  <div class="live-feed-pill">
+    <span class="status-dot"></span>
+    <span>Live Mint: <strong>0x3a9...12f</strong> claimed 2× VIP Pass for Nebula Fest</span>
+  </div>
+</footer>
+
+<!-- 毛玻璃钱包选择 & Loading 弹窗 -->
+<div class="wallet-modal-backdrop" id="walletModal">
+  <div class="wallet-modal-card" role="dialog" aria-modal="true" aria-labelledby="walletModalTitle">
+    <button class="modal-close-x" id="closeModalBtn" title="Close">✕</button>
+
+    <!-- 视图 1：选择钱包 -->
+    <div class="modal-view" id="walletSelectView">
+      <h3 class="modal-title" id="walletModalTitle">Choose a wallet</h3>
+      <p class="modal-sub">Pick one to sign in. You can browse shows without it.</p>
+
+      <button class="wallet-option-btn" id="okxWalletBtn" type="button">
+        <div class="wallet-option-left">
+          <div class="okx-logo-badge">
+            <span></span><span class="empty"></span><span></span>
+            <span class="empty"></span><span></span><span class="empty"></span>
+            <span></span><span class="empty"></span><span></span>
+          </div>
+          <span class="wallet-option-name">OKX Wallet</span>
+        </div>
+        <span class="wallet-option-status">Connect →</span>
+      </button>
+    </div>
+
+    <!-- 视图 2：Loading your account -->
+    <div class="modal-view hidden loading-view-box" id="walletLoadingView">
+      <h3 class="loading-view-title">Loading your account</h3>
+      <div class="loading-status-row">
+        <span class="account-spinner"></span>
+        <span>Loading your account...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/homepage.js"></script>
+</body>
+</html>

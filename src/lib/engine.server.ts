@@ -11,6 +11,7 @@ import type {
   BuyQuote,
   EventDetail,
   EventListItem,
+  HomeOverview,
   InfraStatus,
   LedgerRow,
   MyTicket,
@@ -448,6 +449,128 @@ export async function listEvents(sql: Sql, q = "", wallet: string | null = null)
     [like, holder],
   );
   return rows.map(toListItem);
+}
+
+export async function homeOverview(sql: Sql): Promise<HomeOverview> {
+  await boot(sql);
+  const [ticketAgg, eventAgg, rBps, featuredRows, activityRows] = await Promise.all([
+    sql<{
+      passes_minted: number | null;
+      passes_claimed: number | null;
+      checked_in: number | null;
+    }>`
+      select
+        count(*)::int as passes_minted,
+        count(*) filter (where status in ('owned', 'listed', 'used'))::int as passes_claimed,
+        count(*) filter (where status = 'used')::int as checked_in
+      from tickets
+    `,
+    sql<{ live_events: number | null }>`
+      select count(*)::int as live_events
+      from events
+      where cancelled_at is null and ends_at > now()
+    `,
+    royaltyBps(sql),
+    sql.query<
+      EventCardRow & {
+        organizer_name: string | null;
+        top_tier_name: string | null;
+        sample_chain_id: number | null;
+      }
+    >(
+      `select
+         ec.*,
+         o.name as organizer_name,
+         tt.top_tier_name,
+         st.sample_chain_id
+       from (${EVENT_CARDS}) ec
+       left join organizers o on o.wallet = ec.organizer_wallet
+       left join lateral (
+         select tr.name as top_tier_name
+         from ticket_tiers tr
+         where tr.event_id = ec.id
+         order by tr.face_cents desc, tr.id asc
+         limit 1
+       ) tt on true
+       left join lateral (
+         select t.chain_id as sample_chain_id
+         from tickets t
+         where t.event_id = ec.id and t.chain_id is not null
+         order by t.id asc
+         limit 1
+       ) st on true
+       order by
+         case when ec.cancelled_at is null and ec.ends_at > now() then 0 else 1 end asc,
+         ec.starts_at asc,
+         ec.id desc
+       limit 1`,
+      [],
+    ),
+    sql<{
+      kind: string;
+      from_wallet: string | null;
+      to_wallet: string | null;
+      amount_cents: number | null;
+      ref: string;
+      created_at: string;
+      event_name: string | null;
+    }>`
+      select l.kind, l.from_wallet, l.to_wallet, l.amount_cents, l.ref, l.created_at, e.name as event_name
+      from ledger l
+      left join events e on e.id = l.event_id
+      where l.kind in ('buy_primary', 'buy_resale', 'list', 'checkin', 'mint')
+      order by l.id desc
+      limit 1
+    `,
+  ]);
+
+  const f = featuredRows[0];
+  const act = activityRows[0];
+  const actor = act
+    ? act.kind === "checkin"
+      ? (act.to_wallet ?? act.from_wallet)
+      : (act.from_wallet ?? act.to_wallet)
+    : null;
+
+  return {
+    stats: {
+      passesMinted: Number(ticketAgg[0]?.passes_minted ?? 0),
+      passesClaimed: Number(ticketAgg[0]?.passes_claimed ?? 0),
+      liveEvents: Number(eventAgg[0]?.live_events ?? 0),
+      checkedIn: Number(ticketAgg[0]?.checked_in ?? 0),
+    },
+    royaltyBps: rBps,
+    featured: f
+      ? {
+          id: f.id,
+          name: f.name,
+          venue: f.venue,
+          category: f.category,
+          startsAt: f.starts_at,
+          endsAt: f.ends_at,
+          phase: eventPhase({ cancelled: Boolean(f.cancelled_at), endsAt: f.ends_at }),
+          organizerWallet: f.organizer_wallet,
+          organizerName: f.organizer_name ?? null,
+          collectionAddress: f.collection_address,
+          deployTx: f.deploy_tx,
+          topTierName: f.top_tier_name ?? null,
+          sampleChainId: f.sample_chain_id ?? null,
+          minCents: f.min_cents,
+          available: Number(f.available ?? 0),
+          supply: Number(f.supply ?? 0),
+        }
+      : null,
+    latestActivity: act
+      ? {
+          kind: act.kind,
+          actor,
+          eventName: act.event_name ?? null,
+          amountCents: Number(act.amount_cents ?? 0),
+          ref: act.ref,
+          createdAt: act.created_at,
+        }
+      : null,
+  };
 }
 
 export async function getEvent(sql: Sql, eventId: number): Promise<EventDetail> {
