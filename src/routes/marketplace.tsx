@@ -75,6 +75,7 @@ function MarketplacePage() {
   const [activeDotIdx, setActiveDotIdx] = useState(0);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const marketplaceMainRef = useRef<HTMLElement | null>(null);
   const viewportRef = useRef<HTMLElement | null>(null);
   const speedCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const detailOuterRef = useRef<HTMLElement | null>(null);
@@ -378,6 +379,21 @@ function MarketplacePage() {
     };
   }, [clampOffset]);
 
+  // Prevent text highlighting when dragging with mouse on Marketplace desktop
+  useEffect(() => {
+    const mainEl = marketplaceMainRef.current;
+    if (!mainEl) return;
+    function onSelectStart(e: Event) {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+    }
+    mainEl.addEventListener("selectstart", onSelectStart);
+    return () => {
+      mainEl.removeEventListener("selectstart", onSelectStart);
+    };
+  }, []);
+
   // Pointer & horizontal wheel scrubbing on carousel viewport
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -395,8 +411,13 @@ function MarketplacePage() {
     }
 
     function onPointerDown(e: PointerEvent) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("button") || filteredRef.current.length <= 1) return;
+      if (e.pointerType === "mouse") {
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+      }
       isDraggingRef.current = true;
       wasDraggedRef.current = false;
       startXRef.current = e.clientX;
@@ -440,6 +461,8 @@ function MarketplacePage() {
     viewport.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("blur", onPointerUp);
     viewport.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
@@ -447,6 +470,8 @@ function MarketplacePage() {
       viewport.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("blur", onPointerUp);
       viewport.removeEventListener("wheel", onWheel);
     };
   }, [clampOffset, loadAndOpenEvent]);
@@ -726,7 +751,11 @@ function MarketplacePage() {
 
   return (
     <PublicDarkShell>
-      <main className="marketplace-shell">
+      <main
+        ref={marketplaceMainRef}
+        className="marketplace-shell"
+        onDragStart={(e) => e.preventDefault()}
+      >
         <section className="hero-top">
           <div className="kicker-pill">
             Primary &amp; Verified Secondary Market · <span>Zero Scalper Markup</span>

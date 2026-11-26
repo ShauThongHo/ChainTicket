@@ -679,6 +679,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ct-dark-theme .marketplace-shell input,
+.ct-dark-theme .marketplace-shell textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ct-dark-theme .hero-top {
@@ -1065,6 +1073,7 @@
   opacity: 0.26;
   pointer-events: none;
   mix-blend-mode: lighten;
+  -webkit-user-drag: none;
 }
 
 .ct-dark-theme .card-halftone {
