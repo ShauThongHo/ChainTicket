@@ -148,8 +148,9 @@ function authPopupPlugin(): Plugin {
 export default defineConfig(({ command, isPreview }) => ({
   server: {
     host: "0.0.0.0",
-    port: 8080,
+    port: 8085,
     strictPort: true,
+    allowedHosts: [".trycloudflare.com"],
   },
   preview: {
     host: "127.0.0.1",
