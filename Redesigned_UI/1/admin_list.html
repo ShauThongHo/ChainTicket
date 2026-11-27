@@ -1,0 +1,1809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin List</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Admin 顶部导航栏 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .admin-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.88);
+    border: 1px solid rgba(134, 239, 172, 0.24);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr { color: rgba(255, 255, 255, 0.82); }
+
+  .role-badge-admin {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #86efac;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover { color: #fda4af; }
+
+  /* ================= 3. 主舞台与居中标题区 ================= */
+  .archive-stage {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 120px 32px 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .archive-hero-header {
+    text-align: center;
+    max-width: 680px;
+    margin-bottom: 42px;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition:
+      opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .archive-stage.folder-open .archive-hero-header {
+    display: none;
+  }
+
+  .kicker-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.68);
+    margin-bottom: 18px;
+  }
+
+  .kicker-pill span {
+    color: #86efac;
+    font-weight: 500;
+  }
+
+  .archive-title {
+    font-size: clamp(2.3rem, 4.2vw, 3.5rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: #ffffff;
+    margin-bottom: 10px;
+  }
+
+  .archive-title em {
+    font-style: normal;
+    color: #a7f3d0;
+    text-shadow: 0 0 32px rgba(110, 231, 183, 0.3);
+  }
+
+  .archive-subtitle {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.54);
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  /* ================= 4. GPU 合成层收据向上滑出动画（零重排、零实时大面积模糊） ================= */
+  .receipt-printer-slot {
+    display: none;
+    width: 100%;
+    max-width: 960px;
+    margin-bottom: 22px;
+  }
+
+  .archive-stage.folder-open .receipt-printer-slot {
+    display: block;
+  }
+
+  .receipt-clip-frame {
+    width: 100%;
+    padding: 2px 2px 10px;
+  }
+
+  .receipt-paper-sheet {
+    position: relative;
+    width: 100%;
+    border-radius: 22px 22px 14px 14px;
+    padding: 28px 32px 30px;
+    background: linear-gradient(
+      160deg,
+      rgba(16, 26, 22, 0.96) 0%,
+      rgba(8, 12, 10, 0.98) 100%
+    );
+    border: 1px solid rgba(134, 239, 172, 0.26);
+    border-bottom: 2px dashed rgba(110, 231, 183, 0.38);
+    box-shadow:
+      0 22px 50px rgba(0, 0, 0, 0.78),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    transform-origin: bottom center;
+    will-change: transform, opacity;
+  }
+
+  .receipt-paper-sheet.amber-sheet {
+    border-color: rgba(251, 191, 36, 0.28);
+    border-bottom: 2px dashed rgba(251, 191, 36, 0.4);
+  }
+
+  /* 纯 transform + opacity GPU 合成动画，丝滑 60/120fps */
+  .receipt-printing-anim {
+    animation: thermalReceiptFeed 0.44s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes thermalReceiptFeed {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 36px, 0) scaleY(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scaleY(1);
+    }
+  }
+
+  .receipt-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .receipt-title {
+    font-size: clamp(1.65rem, 2.8vw, 2.15rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+
+  .btn-return-folders {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 15px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .btn-return-folders:hover {
+    background: rgba(110, 231, 183, 0.16);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+  }
+
+  /* ================= 5. KYC Submissions 内部元素样式 ================= */
+  .kyc-filter-box {
+    padding: 20px 22px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .kyc-row-top {
+    display: grid;
+    grid-template-columns: 1.8fr 1fr auto;
+    align-items: end;
+    gap: 14px;
+  }
+
+  .kyc-row-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+
+  .f-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .f-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .f-input,
+  .f-select {
+    width: 100%;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .f-input::placeholder { color: rgba(255, 255, 255, 0.35); }
+  .f-input:focus, .f-select:focus {
+    border-color: rgba(110, 231, 183, 0.48);
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.12);
+  }
+
+  .f-select option {
+    background: #0c1410;
+    color: #ffffff;
+  }
+
+  input[type="date"].f-input { color-scheme: dark; }
+
+  .btn-kyc-search {
+    height: 42px;
+    padding: 0 22px;
+    border-radius: 10px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .btn-kyc-search:hover {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  .registry-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .registry-row-card {
+    padding: 16px 20px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .registry-row-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(110, 231, 183, 0.32);
+  }
+
+  .reg-main-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+
+  .reg-sub-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.52);
+  }
+
+  .reg-actions-grp {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge-approved {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    color: #6ee7b7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .badge-rejected {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(244, 63, 94, 0.2);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .badge-pending {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fde68a;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .btn-row-outline {
+    padding: 7px 15px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .btn-row-outline:hover {
+    background: rgba(110, 231, 183, 0.16);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+  }
+
+  /* ================= 6. Verified Organizers 内部元素样式 ================= */
+  .org-add-card {
+    max-width: 520px;
+    padding: 20px 22px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 22px;
+  }
+
+  .btn-add-organizer {
+    width: 100%;
+    height: 44px;
+    border-radius: 10px;
+    border: none;
+    background: #fbbf24;
+    color: #040605;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .btn-add-organizer:hover {
+    background: #fde68a;
+    transform: translateY(-1px);
+  }
+
+  /* ================= 7. 层叠实体文件夹（KYC 与 Organizers） ================= */
+  .folders-stack-container {
+    position: relative;
+    width: 100%;
+    max-width: 880px;
+    transition: max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .archive-stage.folder-open .folders-stack-container {
+    max-width: 540px;
+  }
+
+  .file-folder {
+    position: relative;
+    width: 100%;
+    cursor: pointer;
+    will-change: transform;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .folder-tab-row {
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .folder-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 28px 0 20px;
+    border-radius: 14px 24px 0 0;
+    font-size: 0.86rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    border-bottom: none !important;
+  }
+
+  .tab-count-pill {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .folder-body {
+    position: relative;
+    width: 100%;
+    border-radius: 0 22px 22px 22px;
+    padding: 28px 32px 38px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .folder-halftone {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-size: 6px 6px;
+    mask-image: radial-gradient(circle at 82% 30%, black 10%, transparent 68%);
+    -webkit-mask-image: radial-gradient(circle at 82% 30%, black 10%, transparent 68%);
+    pointer-events: none;
+    opacity: 0.45;
+  }
+
+  .folder-kyc { z-index: 2; }
+
+  .folder-kyc .folder-tab {
+    background: linear-gradient(180deg, rgba(22, 42, 33, 0.96) 0%, rgba(13, 24, 19, 0.96) 100%);
+    border: 1px solid rgba(110, 231, 183, 0.34);
+    color: #a7f3d0;
+  }
+
+  .folder-kyc .tab-count-pill {
+    background: rgba(110, 231, 183, 0.2);
+    border: 1px solid rgba(110, 231, 183, 0.4);
+    color: #6ee7b7;
+  }
+
+  .folder-kyc .folder-body {
+    min-height: 215px;
+    background:
+      radial-gradient(circle at 82% 20%, rgba(52, 211, 153, 0.2) 0%, transparent 55%),
+      linear-gradient(160deg, rgba(15, 26, 21, 0.96) 0%, rgba(7, 11, 9, 0.98) 100%);
+    border: 1px solid rgba(110, 231, 183, 0.28);
+    box-shadow:
+      0 20px 45px rgba(0, 0, 0, 0.72),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .archive-stage:not(.folder-open) .folder-kyc:hover { transform: translate3d(0, -6px, 0); }
+
+  .folder-organizers {
+    z-index: 4;
+    margin-top: -88px;
+  }
+
+  .folder-organizers .folder-tab-row { padding-left: 195px; }
+
+  .folder-organizers .folder-tab {
+    background: linear-gradient(180deg, rgba(28, 32, 30, 0.97) 0%, rgba(15, 19, 17, 0.97) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.88);
+    border-radius: 18px 22px 0 0;
+  }
+
+  .folder-organizers .tab-count-pill {
+    background: rgba(251, 191, 36, 0.18);
+    border: 1px solid rgba(251, 191, 36, 0.38);
+    color: #fcd34d;
+  }
+
+  .folder-organizers .folder-body {
+    min-height: 225px;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 80% 25%, rgba(251, 191, 36, 0.12) 0%, transparent 55%),
+      linear-gradient(160deg, rgba(16, 20, 18, 0.96) 0%, rgba(7, 10, 9, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 -12px 30px rgba(0, 0, 0, 0.72),
+      0 24px 55px rgba(0, 0, 0, 0.82),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .archive-stage:not(.folder-open) .folder-organizers:hover { transform: translate3d(0, -5px, 0); }
+
+  .folder-info-left {
+    position: relative;
+    z-index: 2;
+    max-width: 480px;
+  }
+
+  .folder-heading {
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+
+  .folder-desc {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.56);
+  }
+
+  .folder-action-pill {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .archive-stage:not(.folder-open) .folder-kyc .folder-action-pill {
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.35);
+    color: #86efac;
+  }
+
+  .archive-stage:not(.folder-open) .folder-kyc:hover .folder-action-pill {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    font-weight: 600;
+  }
+
+  .archive-stage:not(.folder-open) .folder-organizers .folder-action-pill {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+
+  .archive-stage:not(.folder-open) .folder-organizers:hover .folder-action-pill {
+    background: #fbbf24;
+    border-color: #fbbf24;
+    color: #040605;
+    font-weight: 600;
+  }
+
+  .folder-footer-strip {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .archive-stage.folder-open .file-folder:not(.is-active-folder) {
+    display: none;
+  }
+
+  .archive-stage.folder-open .file-folder.is-active-folder {
+    margin-top: 0 !important;
+    transform: translate3d(0, 0, 0);
+    z-index: 6;
+    animation: activeFolderDock 0.36s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes activeFolderDock {
+    from { opacity: 0.7; transform: translate3d(0, 14px, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+
+  .archive-stage.folder-open .file-folder.is-active-folder .folder-tab-row {
+    padding-left: 0 !important;
+  }
+
+  .archive-stage.folder-open .file-folder.is-active-folder .folder-body {
+    border-radius: 0 20px 20px 20px;
+    min-height: 106px;
+    padding: 18px 24px 20px;
+  }
+
+  .archive-stage.folder-open .folder-desc,
+  .archive-stage.folder-open .folder-footer-strip {
+    display: none;
+  }
+
+  .archive-stage.folder-open .folder-heading {
+    font-size: 1.06rem;
+    margin-bottom: 0;
+  }
+
+  .archive-stage.folder-open .folder-kyc.is-active-folder .folder-body {
+    border-color: rgba(110, 231, 183, 0.5);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.82);
+  }
+
+  .archive-stage.folder-open .folder-kyc.is-active-folder .folder-action-pill {
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.48);
+    color: #86efac;
+    font-weight: 600;
+  }
+
+  .archive-stage.folder-open .folder-kyc.is-active-folder .folder-action-pill:hover {
+    background: #6ee7b7;
+    color: #040605;
+  }
+
+  .archive-stage.folder-open .folder-organizers.is-active-folder .folder-body {
+    border-color: rgba(251, 191, 36, 0.48);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.82);
+  }
+
+  .archive-stage.folder-open .folder-organizers.is-active-folder .folder-action-pill {
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.48);
+    color: #fde68a;
+    font-weight: 600;
+  }
+
+  .archive-stage.folder-open .folder-organizers.is-active-folder .folder-action-pill:hover {
+    background: #fbbf24;
+    color: #040605;
+  }
+
+  /* ================= 8. KYC View 审核详情弹窗 ================= */
+  .kyc-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(2, 4, 3, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    will-change: opacity;
+    transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.24s step-end;
+  }
+
+  .kyc-modal-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s step-start;
+  }
+
+  .kyc-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 820px;
+    border-radius: 24px;
+    padding: 32px 34px;
+    background: linear-gradient(
+      155deg,
+      rgba(17, 28, 23, 0.98) 0%,
+      rgba(8, 12, 10, 0.99) 100%
+    );
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    box-shadow:
+      0 28px 70px rgba(0, 0, 0, 0.88),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: translate3d(0, 14px, 0) scale(0.97);
+    will-change: transform;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .kyc-modal-backdrop.open .kyc-modal-card {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  }
+
+  .modal-close-x:hover {
+    background: rgba(110, 231, 183, 0.18);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    transform: rotate(90deg);
+  }
+
+  .kyc-view-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 28px;
+    align-items: center;
+  }
+
+  .kyc-fields-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .kyc-field-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .kyc-field-lbl {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.48);
+    text-transform: uppercase;
+  }
+
+  .kyc-field-val {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: #ffffff;
+    word-break: break-all;
+  }
+
+  .kyc-field-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .kyc-decision-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-kyc-accept {
+    flex: 1;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid #6ee7b7;
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    color: #040605;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+    transition: transform 0.2s, filter 0.2s;
+  }
+
+  .btn-kyc-accept:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+
+  .btn-kyc-reject {
+    flex: 1;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(244, 63, 94, 0.55);
+    background: linear-gradient(145deg, rgba(225, 29, 72, 0.85) 0%, rgba(159, 18, 57, 0.95) 100%);
+    color: #ffffff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(225, 29, 72, 0.22);
+    transition: transform 0.2s, filter 0.2s;
+  }
+
+  .btn-kyc-reject:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+  }
+
+  .kyc-photo-box {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(134, 239, 172, 0.34);
+    background: rgba(6, 12, 9, 0.9);
+    cursor: zoom-in;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+    transition: border-color 0.25s, transform 0.25s;
+  }
+
+  .kyc-photo-box:hover {
+    border-color: #6ee7b7;
+    transform: scale(1.015);
+  }
+
+  .kyc-photo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .photo-zoom-badge {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: rgba(4, 6, 5, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    color: #86efac;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* 全屏证件放大灯箱 (Lightbox) */
+  .photo-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: rgba(2, 4, 3, 0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    cursor: zoom-out;
+    will-change: opacity;
+    transition: opacity 0.22s ease, visibility 0.22s step-end;
+  }
+
+  .photo-lightbox-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.22s ease, visibility 0s step-start;
+  }
+
+  .photo-lightbox-backdrop img {
+    max-width: min(92vw, 900px);
+    max-height: 82vh;
+    border-radius: 18px;
+    border: 1px solid rgba(134, 239, 172, 0.4);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.92);
+    transform: scale(0.94);
+    will-change: transform;
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .photo-lightbox-backdrop.open img {
+    transform: scale(1);
+  }
+
+  .lightbox-hint {
+    margin-top: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  @media (max-width: 780px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .archive-stage { padding: 102px 20px 60px; }
+    .kyc-row-top, .kyc-row-bottom { grid-template-columns: 1fr; }
+    .folder-organizers .folder-tab-row { padding-left: 120px; }
+    .kyc-view-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html">Dashboard</a>
+      <a href="admin_list.html" class="active">List</a>
+      <a href="admin_setup.html">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="archive-stage" id="archiveStage">
+  <!-- 初始居中主标题区 -->
+  <div class="archive-hero-header">
+    <div class="kicker-pill">Admin Compliance &amp; Registry · <span>2 Active Folders</span></div>
+    <h1 class="archive-title">Admin <em>Directory</em></h1>
+    <p class="archive-subtitle">
+      Select a folder below to review anti-sybil KYC submissions or manage verified event organizers on-chain.
+    </p>
+  </div>
+
+  <!-- 点开文件夹后，表格像热敏打印机出收据一样向上滑出的展示槽 -->
+  <section class="receipt-printer-slot" id="receiptPrinterSlot">
+    <div class="receipt-clip-frame">
+      <div class="receipt-paper-sheet" id="receiptPaperSheet"></div>
+    </div>
+  </section>
+
+  <!-- 两个层叠实体文件夹：KYC 与 Organizers -->
+  <section class="folders-stack-container">
+    <div class="file-folder folder-kyc" id="folderKyc">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>KYC</span>
+          <span class="tab-count-pill" id="kycCountBadge">1</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">KYC Submissions</h2>
+          <p class="folder-desc">
+            Inspect attendee anti-sybil verification records, AES-256-GCM credential hashes, and document expiry statuses.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="kycActionPill" type="button">Open Folder →</button>
+      </div>
+    </div>
+
+    <div class="file-folder folder-organizers" id="folderOrganizers">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>Organizers</span>
+          <span class="tab-count-pill" id="orgCountBadge">1</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">Verified Organizers</h2>
+          <p class="folder-desc">
+            Whitelist new event organizer wallets or revoke on-chain event deployment permissions.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="orgActionPill" type="button">Open Folder →</button>
+
+        <div class="folder-footer-strip">
+          <span>ON-CHAIN REGISTRY ARCHIVE</span>
+          <span>GNOSIS / DxDAI L2</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- KYC View 审核详情弹窗 -->
+<div class="kyc-modal-backdrop" id="kycDetailModal">
+  <div class="kyc-modal-card" role="dialog" aria-modal="true">
+    <button class="modal-close-x" id="closeKycModalBtn" type="button" title="Close">✕</button>
+    <div class="kyc-view-grid" id="kycModalContent"></div>
+  </div>
+</div>
+
+<!-- 证件扫描件全屏放大灯箱 -->
+<div class="photo-lightbox-backdrop" id="photoLightbox">
+  <img id="lightboxImg" src="" alt="Enlarged Credential Scan">
+  <div class="lightbox-hint">Click anywhere or press ESC to close enlarged preview</div>
+</div>
+
+<script>
+  /* ================= 1. Sign out ================= */
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 生成内嵌高清晰度示例证件扫描件 (SVG Data URI) ================= */
+  const samplePassportSvg = `data:image/svg+xml;utf8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="440" viewBox="0 0 640 440">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0f2920"/>
+          <stop offset="100%" stop-color="#07120e"/>
+        </linearGradient>
+      </defs>
+      <rect width="640" height="440" rx="20" fill="url(#bg)"/>
+      <rect x="18" y="18" width="604" height="404" rx="14" fill="none" stroke="#6ee7b7" stroke-opacity="0.35" stroke-width="2"/>
+      <rect x="38" y="38" width="564" height="44" rx="8" fill="#10b981" fill-opacity="0.16"/>
+      <text x="54" y="66" fill="#86efac" font-family="monospace" font-size="18" font-weight="bold">REPUBLIC OF SINGAPORE · IDENTITY PASS</text>
+      <rect x="42" y="106" width="142" height="178" rx="10" fill="#16382c" stroke="#6ee7b7" stroke-opacity="0.4"/>
+      <circle cx="113" cy="168" r="32" fill="#6ee7b7" fill-opacity="0.45"/>
+      <path d="M62 262 C62 222, 164 222, 164 262" fill="#6ee7b7" fill-opacity="0.45"/>
+      <text x="210" y="132" fill="#9ca3af" font-family="monospace" font-size="13">SURNAME / GIVEN NAME</text>
+      <text x="210" y="156" fill="#ffffff" font-family="monospace" font-size="21" font-weight="bold">HO ALEX TAN</text>
+      <text x="210" y="196" fill="#9ca3af" font-family="monospace" font-size="13">DOCUMENT NO.</text>
+      <text x="210" y="220" fill="#6ee7b7" font-family="monospace" font-size="20" font-weight="bold">S9001284A</text>
+      <text x="210" y="260" fill="#9ca3af" font-family="monospace" font-size="13">NATIONALITY / EXPIRY</text>
+      <text x="210" y="284" fill="#ffffff" font-family="monospace" font-size="17">SINGAPORE  ·  15/12/2027</text>
+      <rect x="42" y="320" width="556" height="72" rx="8" fill="#040a08" stroke="#ffffff" stroke-opacity="0.1"/>
+      <text x="58" y="350" fill="#86efac" font-family="monospace" font-size="14" letter-spacing="2">P&lt;SGPHO&lt;&lt;ALEX&lt;TAN&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+      <text x="58" y="376" fill="#86efac" font-family="monospace" font-size="14" letter-spacing="2">S9001284A4SGP9604128M2712156&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;08</text>
+    </svg>
+  `)}`;
+
+  /* ================= 3. KYC Submissions 完整数据 ================= */
+  const kycSubmissionsData = [
+    {
+      id: 1,
+      walletShort: "0xf5c8...4ede",
+      walletFull: "0xf5c89a214b8091e4c3d72a61b08e94f3c11d4ede",
+      refHash: "037625e96ab5...",
+      submittedAt: "11/10/2026, 5:40:01 PM",
+      expiryShort: "exp 2027-12-15",
+      expiryDate: "15/12/2027",
+      status: "approved",
+      fullName: "Ho Alex Tan",
+      idNumber: "S9001284A",
+      nationality: "Singapore",
+      docPhoto: samplePassportSvg
+    }
+  ];
+
+  /* ================= 4. Verified Organizers 数据 ================= */
+  const verifiedOrganizersData = [
+    {
+      label: "Demo Organizer",
+      wallet: "0xb937...d78e",
+      status: "approved",
+      eventsCount: 5
+    }
+  ];
+
+  /* ================= 5. KYC View 详情弹窗与图片放大灯箱 ================= */
+  const kycDetailModal = document.getElementById("kycDetailModal");
+  const kycModalContent = document.getElementById("kycModalContent");
+  const closeKycModalBtn = document.getElementById("closeKycModalBtn");
+  const photoLightbox = document.getElementById("photoLightbox");
+  const lightboxImg = document.getElementById("lightboxImg");
+
+  let activeKycFilterQuery = "";
+  let activeKycFilterStatus = "Any";
+
+  window.openKycDetailModal = function(kycId) {
+    const item = kycSubmissionsData.find(k => k.id === kycId);
+    if (!item) return;
+
+    kycModalContent.innerHTML = `
+      <div class="kyc-fields-col">
+        <div class="kyc-field-item">
+          <span class="kyc-field-lbl">Wallet Address</span>
+          <span class="kyc-field-val">${item.walletFull}</span>
+        </div>
+
+        <div class="kyc-field-item">
+          <span class="kyc-field-lbl">Ref</span>
+          <span class="kyc-field-val" style="color:#86efac;">${item.refHash}</span>
+        </div>
+
+        <div class="kyc-field-pair">
+          <div class="kyc-field-item">
+            <span class="kyc-field-lbl">Name</span>
+            <span class="kyc-field-val">${item.fullName}</span>
+          </div>
+
+          <div class="kyc-field-item">
+            <span class="kyc-field-lbl">ID Number</span>
+            <span class="kyc-field-val">${item.idNumber}</span>
+          </div>
+        </div>
+
+        <div class="kyc-field-pair">
+          <div class="kyc-field-item">
+            <span class="kyc-field-lbl">Nationality</span>
+            <span class="kyc-field-val">${item.nationality}</span>
+          </div>
+
+          <div class="kyc-field-item">
+            <span class="kyc-field-lbl">Expiry date</span>
+            <span class="kyc-field-val">${item.expiryDate}</span>
+          </div>
+        </div>
+
+        <div class="kyc-decision-row">
+          <button class="btn-kyc-accept" type="button" onclick="decideKycStatus(${item.id}, 'approved')">
+            Accept
+          </button>
+          <button class="btn-kyc-reject" type="button" onclick="decideKycStatus(${item.id}, 'rejected')">
+            Reject
+          </button>
+        </div>
+      </div>
+
+      <div class="kyc-photo-box" onclick="enlargeKycPhoto('${item.docPhoto}')" title="Click to enlarge photo">
+        <img src="${item.docPhoto}" alt="Credential Scan">
+        <span class="photo-zoom-badge">🔍 Click to enlarge</span>
+      </div>
+    `;
+
+    kycDetailModal.classList.add("open");
+  };
+
+  window.closeKycDetailModal = function() {
+    kycDetailModal.classList.remove("open");
+  };
+
+  window.decideKycStatus = function(kycId, newStatus) {
+    const item = kycSubmissionsData.find(k => k.id === kycId);
+    if (!item) return;
+    item.status = newStatus;
+    closeKycDetailModal();
+    renderKycReceipt(activeKycFilterQuery, activeKycFilterStatus);
+  };
+
+  window.enlargeKycPhoto = function(src) {
+    lightboxImg.src = src;
+    photoLightbox.classList.add("open");
+  };
+
+  photoLightbox.addEventListener("click", () => {
+    photoLightbox.classList.remove("open");
+  });
+
+  closeKycModalBtn.addEventListener("click", closeKycDetailModal);
+  kycDetailModal.addEventListener("click", (e) => {
+    if (e.target === kycDetailModal) closeKycDetailModal();
+  });
+
+  /* ================= 6. 文件夹展开与 GPU 合成层收据向上吐出动画 ================= */
+  const archiveStage = document.getElementById("archiveStage");
+  const receiptPaperSheet = document.getElementById("receiptPaperSheet");
+  const folderKyc = document.getElementById("folderKyc");
+  const folderOrganizers = document.getElementById("folderOrganizers");
+  const kycActionPill = document.getElementById("kycActionPill");
+  const orgActionPill = document.getElementById("orgActionPill");
+
+  let activeFolder = null;
+
+  function triggerReceiptPrintAnimation(isAmber) {
+    receiptPaperSheet.classList.toggle("amber-sheet", isAmber);
+    receiptPaperSheet.classList.remove("receipt-printing-anim");
+    requestAnimationFrame(() => {
+      receiptPaperSheet.classList.add("receipt-printing-anim");
+    });
+  }
+
+  function renderKycReceipt(filterQuery = "", filterStatus = "Any") {
+    activeKycFilterQuery = filterQuery;
+    activeKycFilterStatus = filterStatus;
+
+    const q = filterQuery.trim().toLowerCase();
+    const filtered = kycSubmissionsData.filter(item => {
+      const matchQ = !q ||
+        item.walletShort.toLowerCase().includes(q) ||
+        item.walletFull.toLowerCase().includes(q) ||
+        item.refHash.toLowerCase().includes(q);
+      const matchS = filterStatus === "Any" || item.status.toLowerCase() === filterStatus.toLowerCase();
+      return matchQ && matchS;
+    });
+
+    const rowsHtml = filtered.length > 0
+      ? filtered.map(item => {
+          const statusCls =
+            item.status === "approved" ? "badge-approved" :
+            item.status === "rejected" ? "badge-rejected" : "badge-pending";
+
+          return `
+            <div class="registry-row-card">
+              <div>
+                <div class="reg-main-id">${item.walletShort}</div>
+                <div class="reg-sub-meta">${item.refHash} · ${item.submittedAt} · ${item.expiryShort}</div>
+              </div>
+              <div class="reg-actions-grp">
+                <span class="${statusCls}">${item.status}</span>
+                <button class="btn-row-outline" type="button" onclick="openKycDetailModal(${item.id})">
+                  View
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("")
+      : `<div style="padding:20px;text-align:center;color:rgba(255,255,255,0.45);font-size:0.84rem;">No matching KYC submissions found.</div>`;
+
+    receiptPaperSheet.innerHTML = `
+      <div class="receipt-top-bar">
+        <h2 class="receipt-title">KYC Submissions</h2>
+        <button class="btn-return-folders" type="button" onclick="closeFolders()">↓ Close Folder</button>
+      </div>
+
+      <div class="kyc-filter-box">
+        <div class="kyc-row-top">
+          <div class="f-group">
+            <label class="f-label">Wallet or reference</label>
+            <input class="f-input" type="text" id="kycQueryInput" value="${filterQuery}" placeholder="0x... or kyc ref">
+          </div>
+
+          <div class="f-group">
+            <label class="f-label">Status</label>
+            <select class="f-select" id="kycStatusSelect">
+              <option value="Any" ${filterStatus === "Any" ? "selected" : ""}>Any</option>
+              <option value="approved" ${filterStatus === "approved" ? "selected" : ""}>Approved</option>
+              <option value="rejected" ${filterStatus === "rejected" ? "selected" : ""}>Rejected</option>
+            </select>
+          </div>
+
+          <button class="btn-kyc-search" id="kycSearchBtn" type="button">Search</button>
+        </div>
+
+        <div class="kyc-row-bottom">
+          <div class="f-group">
+            <label class="f-label">From</label>
+            <input class="f-input" type="date" id="kycFromDate">
+          </div>
+          <div class="f-group">
+            <label class="f-label">To</label>
+            <input class="f-input" type="date" id="kycToDate">
+          </div>
+        </div>
+      </div>
+
+      <div class="registry-rows-list">${rowsHtml}</div>
+    `;
+
+    document.getElementById("kycSearchBtn").addEventListener("click", () => {
+      const qVal = document.getElementById("kycQueryInput").value;
+      const sVal = document.getElementById("kycStatusSelect").value;
+      renderKycReceipt(qVal, sVal);
+    });
+  }
+
+  function renderOrganizersReceipt() {
+    document.getElementById("orgCountBadge").textContent = verifiedOrganizersData.length;
+
+    const listHtml = verifiedOrganizersData.map((org, idx) => `
+      <div class="registry-row-card">
+        <div>
+          <div class="reg-main-id" style="font-family:inherit;">${org.label}</div>
+          <div class="reg-sub-meta">${org.wallet}</div>
+        </div>
+        <div class="reg-actions-grp">
+          <span class="${org.status === 'approved' ? 'badge-approved' : 'badge-rejected'}">${org.status}</span>
+          <span style="font-family:monospace;font-size:0.78rem;color:rgba(255,255,255,0.55);">${org.eventsCount} events</span>
+          <button class="btn-row-outline" type="button" onclick="toggleOrganizerRevoke(${idx})">
+            ${org.status === "approved" ? "Revoke" : "Restore"}
+          </button>
+        </div>
+      </div>
+    `).join("");
+
+    receiptPaperSheet.innerHTML = `
+      <div class="receipt-top-bar">
+        <h2 class="receipt-title">Verified Organizers</h2>
+        <button class="btn-return-folders" type="button" onclick="closeFolders()">↓ Close Folder</button>
+      </div>
+
+      <div class="org-add-card">
+        <div class="f-group">
+          <label class="f-label" for="newOrgWallet">Organizer wallet</label>
+          <input class="f-input" type="text" id="newOrgWallet" placeholder="0x...">
+        </div>
+
+        <div class="f-group">
+          <label class="f-label" for="newOrgLabel">Label / name</label>
+          <input class="f-input" type="text" id="newOrgLabel" placeholder="Venue company">
+        </div>
+
+        <button class="btn-add-organizer" id="addOrganizerBtn" type="button">Add Organizer</button>
+      </div>
+
+      <div class="registry-rows-list">${listHtml}</div>
+    `;
+
+    document.getElementById("addOrganizerBtn").addEventListener("click", () => {
+      const wInp = document.getElementById("newOrgWallet");
+      const lInp = document.getElementById("newOrgLabel");
+      const w = wInp.value.trim();
+      const l = lInp.value.trim();
+      if (!w || !l) {
+        alert("Please enter both Organizer wallet and Label / name.");
+        return;
+      }
+      const shortWallet = w.length > 12 ? `${w.slice(0, 6)}...${w.slice(-4)}` : w;
+      verifiedOrganizersData.unshift({
+        label: l,
+        wallet: shortWallet,
+        status: "approved",
+        eventsCount: 0
+      });
+      renderOrganizersReceipt();
+    });
+  }
+
+  window.toggleOrganizerRevoke = function(idx) {
+    const target = verifiedOrganizersData[idx];
+    if (!target) return;
+    target.status = target.status === "approved" ? "revoked" : "approved";
+    renderOrganizersReceipt();
+  };
+
+  function openFolder(type) {
+    activeFolder = type;
+    archiveStage.classList.add("folder-open");
+
+    folderKyc.classList.toggle("is-active-folder", type === "kyc");
+    folderOrganizers.classList.toggle("is-active-folder", type === "organizers");
+
+    kycActionPill.textContent = "Switch to Organizers ⇄";
+    orgActionPill.textContent = "Switch to KYC ⇄";
+
+    if (type === "kyc") {
+      renderKycReceipt(activeKycFilterQuery, activeKycFilterStatus);
+      triggerReceiptPrintAnimation(false);
+    } else {
+      renderOrganizersReceipt();
+      triggerReceiptPrintAnimation(true);
+    }
+  }
+
+  window.closeFolders = function() {
+    activeFolder = null;
+    archiveStage.classList.remove("folder-open");
+    folderKyc.classList.remove("is-active-folder");
+    folderOrganizers.classList.remove("is-active-folder");
+    kycActionPill.textContent = "Open Folder →";
+    orgActionPill.textContent = "Open Folder →";
+  };
+
+  folderKyc.addEventListener("click", () => {
+    if (archiveStage.classList.contains("folder-open")) {
+      openFolder(activeFolder === "kyc" ? "organizers" : "kyc");
+    } else {
+      openFolder("kyc");
+    }
+  });
+
+  folderOrganizers.addEventListener("click", () => {
+    if (archiveStage.classList.contains("folder-open")) {
+      openFolder(activeFolder === "organizers" ? "kyc" : "organizers");
+    } else {
+      openFolder("organizers");
+    }
+  });
+
+  kycActionPill.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (archiveStage.classList.contains("folder-open")) openFolder("organizers");
+    else openFolder("kyc");
+  });
+
+  orgActionPill.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (archiveStage.classList.contains("folder-open")) openFolder("kyc");
+    else openFolder("organizers");
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (photoLightbox.classList.contains("open")) {
+        photoLightbox.classList.remove("open");
+      } else if (kycDetailModal.classList.contains("open")) {
+        closeKycDetailModal();
+      } else if (archiveStage.classList.contains("folder-open")) {
+        closeFolders();
+      }
+    }
+  });
+
+  /* ================= 7. 高性能暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.4,
+    alpha: 0.16 + Math.random() * 0.42,
+    vy: -(0.08 + Math.random() * 0.18),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 18;
+  const RIBBON_SEGS = 64;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = 0.85;
+
+    const hasMouse = smoothMouse.x > -500;
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (hasMouse) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 48400 && distSq > 0.01) {
+            const dist = Math.sqrt(distSq);
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = 0.024 + centerGlow * 0.075;
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+  let lastFrameTime = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    // 弹窗打开时自动降频后台 Canvas，保障前景弹窗交互零掉帧
+    const isModalActive =
+      kycDetailModal.classList.contains("open") ||
+      photoLightbox.classList.contains("open");
+    if (isModalActive && now - lastFrameTime < 50) return;
+    lastFrameTime = now;
+
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    const hasMouse = smoothMouse.x > -500;
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (hasMouse) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 32400 && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a.toFixed(3)})`
+        : `rgba(255, 255, 255, ${(a * 0.8).toFixed(3)})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>
