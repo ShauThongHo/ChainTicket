@@ -307,7 +307,7 @@
     color: #ffffff;
   }
 
-  /* ================= 5. 下方 Shows 精简列表面板（图2排版 + 图3-6活动与按钮） ================= */
+  /* ================= 5. 下方 Shows 精简列表面板 ================= */
   .shows-panel-card {
     border-radius: 22px;
     padding: 26px 28px;
@@ -348,16 +348,24 @@
     background: rgba(255, 255, 255, 0.025);
     border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 16px;
+    cursor: pointer;
     transition: border-color 0.2s, background-color 0.2s;
   }
 
   .show-row-item:hover {
     background: rgba(255, 255, 255, 0.042);
     border-color: rgba(110, 231, 183, 0.28);
+  }
+
+  .show-row-main-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
   }
 
   .show-row-left {
@@ -405,6 +413,12 @@
     color: #fde68a;
   }
 
+  .s-badge.disputed {
+    background: rgba(244, 63, 94, 0.18);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+  }
+
   .s-badge.cancelled {
     background: rgba(244, 63, 94, 0.18);
     border: 1px solid rgba(244, 63, 94, 0.42);
@@ -425,7 +439,7 @@
     color: #ffffff;
   }
 
-  /* 右侧两个操作按钮（图3-图6样式） */
+  /* 右侧操作按钮 */
   .show-row-actions {
     display: flex;
     align-items: center;
@@ -483,6 +497,130 @@
     color: rgba(255, 255, 255, 0.38);
     cursor: not-allowed;
     box-shadow: none;
+  }
+
+  /* ================= 图3元素：同一格子内嵌的仲裁证据提交区块 ================= */
+  .arbitration-inline-box {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    cursor: default;
+  }
+
+  .arbitration-hint-text {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .arbitration-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .file-picker-box {
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: rgba(4, 7, 6, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .file-picker-box:hover {
+    border-color: rgba(110, 231, 183, 0.45);
+  }
+
+  .file-picker-box input[type="file"] {
+    display: none;
+  }
+
+  .file-picker-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .file-picker-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.52);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-picker-name.has-file {
+    color: #86efac;
+  }
+
+  .cid-input-box {
+    width: 100%;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 9px;
+    background: rgba(4, 7, 6, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    outline: none;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .cid-input-box::placeholder {
+    color: rgba(255, 255, 255, 0.36);
+  }
+
+  .cid-input-box:focus {
+    border-color: rgba(251, 191, 36, 0.55);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.14);
+  }
+
+  .btn-escalate-admin {
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 9px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.18);
+    color: #fde68a;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s;
+  }
+
+  .btn-escalate-admin:hover:not(:disabled) {
+    background: #fbbf24;
+    color: #040605;
+    transform: translateY(-1px);
+  }
+
+  .btn-escalate-admin:disabled {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.34);
+    cursor: not-allowed;
   }
 
   /* ================= 6. 两步链上交易进度确认弹窗 ================= */
@@ -649,7 +787,7 @@
     .organizer-shell { padding: 98px 18px 56px; }
     .metrics-top-grid { grid-template-columns: 1fr; }
     .shows-panel-card { padding: 20px 18px; }
-    .show-row-item {
+    .show-row-main-bar {
       flex-direction: column;
       align-items: flex-start;
     }
@@ -659,6 +797,9 @@
     .btn-cancel-refund,
     .btn-holder-vote {
       flex: 1;
+    }
+    .arbitration-controls-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -677,7 +818,7 @@
       ChainTicket
     </a>
     <nav class="nav-pills">
-      <a href="organizer_shows.html" class="active">Shows</a>
+      <a href="admin_shows.html" class="active">Shows</a>
       <a href="organizer_gate.html">Gate</a>
       <a href="organizer_new_show.html">New Show</a>
     </nav>
@@ -706,7 +847,7 @@
 </header>
 
 <main class="organizer-shell">
-  <!-- 上方三指标卡片（图1元素） -->
+  <!-- 上方三指标卡片 -->
   <section class="metrics-top-grid">
     <div class="metric-glass-card">
       <div class="metric-card-top">
@@ -750,7 +891,7 @@
     </div>
   </section>
 
-  <!-- 下方精简活动列表（图2排版 + 图3~图6活动与右侧按钮） -->
+  <!-- 下方精简活动列表（Test 2 同一格子内包含图3的仲裁证据提交区块） -->
   <section class="shows-panel-card">
     <div class="shows-panel-header">
       <h2>Shows</h2>
@@ -878,7 +1019,7 @@
     }
   });
 
-  /* ================= 3. 图3~图6 活动数据 ================= */
+  /* ================= 3. 活动数据 ================= */
   const organizerShowsData = [
     {
       id: 1,
@@ -890,7 +1031,8 @@
       vaultAmount: 25.00,
       canCancel: true,
       showHolderVoteBtn: true,
-      canOpenVote: false
+      canOpenVote: false,
+      hasArbitrationBox: false
     },
     {
       id: 2,
@@ -898,11 +1040,12 @@
       status: "active",
       statusLabel: "Active",
       subBadge: null,
-      checkinLabel: "0% checked in",
+      checkinLabel: "100% checked in",
       vaultAmount: 40.00,
       canCancel: true,
       showHolderVoteBtn: true,
-      canOpenVote: false
+      canOpenVote: false,
+      hasArbitrationBox: false
     },
     {
       id: 3,
@@ -914,7 +1057,8 @@
       vaultAmount: 10.00,
       canCancel: false,
       showHolderVoteBtn: true,
-      canOpenVote: true
+      canOpenVote: true,
+      hasArbitrationBox: false
     },
     {
       id: 4,
@@ -926,7 +1070,11 @@
       vaultAmount: 0.00,
       canCancel: false,
       showHolderVoteBtn: false,
-      canOpenVote: false
+      canOpenVote: false,
+      hasArbitrationBox: true,
+      selectedFileName: "",
+      evidenceCid: "",
+      escalated: false
     },
     {
       id: 5,
@@ -938,7 +1086,8 @@
       vaultAmount: 0.00,
       canCancel: false,
       showHolderVoteBtn: false,
-      canOpenVote: false
+      canOpenVote: false,
+      hasArbitrationBox: false
     }
   ];
 
@@ -969,34 +1118,113 @@
       const holderVoteBtnHtml = item.showHolderVoteBtn
         ? `<button class="btn-holder-vote" type="button"
              ${item.canOpenVote ? "" : "disabled"}
-             onclick="handleOpenHolderVote(${item.id})">
+             onclick="event.stopPropagation(); handleOpenHolderVote(${item.id})">
              Open Holder Vote
            </button>`
         : "";
 
-      return `
-        <div class="show-row-item">
-          <div class="show-row-left">
-            <div class="show-badges-line">
-              <span class="s-badge ${statusCls}">${item.statusLabel}</span>
-              ${subBadgeHtml}
-              <span class="s-badge checkin">${item.checkinLabel}</span>
+      // 图3元素：直接放在 Test 2 同一个格子的下方
+      const canEscalate = !item.escalated && Boolean(item.selectedFileName || (item.evidenceCid && item.evidenceCid.trim()));
+      const arbitrationHtml = item.hasArbitrationBox
+        ? `
+          <div class="arbitration-inline-box" onclick="event.stopPropagation()">
+            <p class="arbitration-hint-text">
+              Ticket holders may file objections for 7 days. At 1/3 opposition, dispute triggers Admin arbitration.
+            </p>
+            <div class="arbitration-controls-grid">
+              <label class="file-picker-box">
+                <input type="file" onchange="handleEvidenceFileChange(${item.id}, this)">
+                <span class="file-picker-btn">Choose File</span>
+                <span class="file-picker-name ${item.selectedFileName ? 'has-file' : ''}" id="fileLabel-${item.id}">
+                  ${item.selectedFileName || "No file chosen"}
+                </span>
+              </label>
+
+              <input class="cid-input-box" type="text"
+                value="${item.evidenceCid || ""}"
+                placeholder="or paste ipfs://... evidence CID"
+                oninput="handleEvidenceCidInput(${item.id}, this.value)">
+
+              <button class="btn-escalate-admin" id="escalateBtn-${item.id}" type="button"
+                ${canEscalate ? "" : "disabled"}
+                onclick="handleEscalateToAdmin(${item.id})">
+                ${item.escalated ? "Escalated ✓" : "Escalate to Admin"}
+              </button>
             </div>
-            <div class="show-title-text">${item.title}</div>
+          </div>
+        `
+        : "";
+
+      return `
+        <div class="show-row-item" onclick="window.location.href='organizer_show_detail.html?id=${item.id}'">
+          <div class="show-row-main-bar">
+            <div class="show-row-left">
+              <div class="show-badges-line">
+                <span class="s-badge ${statusCls}">${item.statusLabel}</span>
+                ${subBadgeHtml}
+                <span class="s-badge checkin">${item.checkinLabel}</span>
+              </div>
+              <div class="show-title-text">${item.title}</div>
+            </div>
+
+            <div class="show-row-actions">
+              <button class="btn-cancel-refund" type="button"
+                ${item.canCancel ? "" : "disabled"}
+                onclick="event.stopPropagation(); handleCancelAndRefund(${item.id})">
+                Cancel &amp; Refund
+              </button>
+              ${holderVoteBtnHtml}
+            </div>
           </div>
 
-          <div class="show-row-actions">
-            <button class="btn-cancel-refund" type="button"
-              ${item.canCancel ? "" : "disabled"}
-              onclick="handleCancelAndRefund(${item.id})">
-              Cancel &amp; Refund
-            </button>
-            ${holderVoteBtnHtml}
-          </div>
+          ${arbitrationHtml}
         </div>
       `;
     }).join("");
   }
+
+  window.handleEvidenceFileChange = function(showId, inputEl) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item) return;
+    const file = inputEl.files && inputEl.files[0];
+    item.selectedFileName = file ? file.name : "";
+    const labelEl = document.getElementById(`fileLabel-${showId}`);
+    if (labelEl) {
+      labelEl.textContent = item.selectedFileName || "No file chosen";
+      labelEl.classList.toggle("has-file", Boolean(item.selectedFileName));
+    }
+    const btn = document.getElementById(`escalateBtn-${showId}`);
+    if (btn && !item.escalated) {
+      btn.disabled = !(item.selectedFileName || (item.evidenceCid && item.evidenceCid.trim()));
+    }
+  };
+
+  window.handleEvidenceCidInput = function(showId, val) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item) return;
+    item.evidenceCid = val;
+    const btn = document.getElementById(`escalateBtn-${showId}`);
+    if (btn && !item.escalated) {
+      btn.disabled = !(item.selectedFileName || val.trim());
+    }
+  };
+
+  window.handleEscalateToAdmin = function(showId) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item || item.escalated) return;
+
+    runTwoStepTxModal({
+      title: `Escalate to Admin · ${item.title}`,
+      step1Label: "Sign arbitration evidence payload in wallet",
+      step2Label: "Pin evidence CID & freeze vault payout",
+      step2DoneLabel: "Escalated",
+      onComplete: () => {
+        item.escalated = true;
+        item.subBadge = { text: "Admin Arbitration", cls: "disputed" };
+        renderShowsList();
+      }
+    });
+  };
 
   window.handleCancelAndRefund = function(showId) {
     const item = organizerShowsData.find(s => s.id === showId);
@@ -1032,6 +1260,10 @@
         item.subBadge = { text: "7-Day Objection Window", cls: "window" };
         item.showHolderVoteBtn = false;
         item.canOpenVote = false;
+        item.hasArbitrationBox = true;
+        item.selectedFileName = "";
+        item.evidenceCid = "";
+        item.escalated = false;
         renderShowsList();
       }
     });
