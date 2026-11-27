@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Ticket Archive</title>
+<link rel="stylesheet" href="css/customer_my_ticket.css">
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="homepage.html">Home</a>
+      <a href="marketplace.html">Marketplace</a>
+      <a href="my_ticket.html" class="active">My Tickets</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <button class="btn-claim-mini" id="claimFaucetBtn" type="button" title="Claim 100 Testnet DxDAI">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9.5" cy="9.5" r="5.5"></circle>
+        <path d="M9.5 7.5v4"></path>
+        <path d="M15.8 10.2a5.5 5.5 0 1 1-5.6 5.6"></path>
+      </svg>
+      <span>Claim 100 DxDAI</span>
+    </button>
+
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="attendee-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span id="navBalanceText">25.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xF5C8...4eDE</span>
+      <span class="role-badge-attendee">ATTENDEE</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="archive-stage" id="archiveStage">
+  <!-- 文件夹上方的居中标题元素 -->
+  <div class="archive-hero-header">
+    <div class="kicker-pill">Encrypted On-Chain Vault · <span>5 Verified Passes</span></div>
+    <h1 class="archive-title">Ticket <em>Archive</em></h1>
+    <p class="archive-subtitle">
+      Select a folder below to inspect your unused gate passes or review past show history and organizer payout governance.
+    </p>
+  </div>
+
+  <!-- 电脑端专属：点击文件夹后弹出的精简信息无限循环滑动轨道 -->
+  <section class="desktop-fan-stage" id="desktopFanStage">
+    <div class="desktop-fan-toolbar">
+      <span class="desktop-folder-badge" id="desktopFolderLabel">Unused Passes (3)</span>
+      <button class="btn-desktop-collapse" id="desktopCollapseBtn" type="button">↓ Return to Folders</button>
+    </div>
+
+    <div class="desktop-carousel-viewport" id="desktopCarouselViewport">
+      <div class="desktop-carousel-track" id="desktopCarouselTrack"></div>
+    </div>
+
+    <svg class="fan-beams-svg" viewBox="0 0 960 64" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="beamGradL" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0.06"/>
+        </linearGradient>
+        <linearGradient id="beamGradR" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6ee7b7" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0.06"/>
+        </linearGradient>
+      </defs>
+      <line x1="120" y1="2" x2="290" y2="62" stroke="url(#beamGradL)" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <line x1="840" y1="2" x2="670" y2="62" stroke="url(#beamGradR)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    </svg>
+  </section>
+
+  <!-- 两个层叠实体文件夹 -->
+  <section class="folders-stack-container">
+    <div class="file-folder folder-unused" id="folderUnused">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>Unused Passes</span>
+          <span class="tab-count-pill" id="unusedCountBadge">3</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">Active &amp; Upcoming Passes</h2>
+          <p class="folder-desc">
+            Valid ERC-721 event tickets ready for venue gate scanning with HMAC-SHA256 rotating QR codes or verified resale listing.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="unusedHintPill" type="button">Open Passes →</button>
+      </div>
+    </div>
+
+    <div class="file-folder folder-used" id="folderUsed">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>Used &amp; History</span>
+          <span class="tab-count-pill" id="usedCountBadge">2</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">Past Events &amp; Payout Governance</h2>
+          <p class="folder-desc">
+            Completed event stubs, locked gate passes, and active organizer payout proposals open for attendee objection voting.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="usedHintPill" type="button">Open Passes →</button>
+
+        <div class="folder-footer-strip">
+          <span>HMAC-SHA256 VERIFIED ARCHIVE</span>
+          <span>GNOSIS / DxDAI L2</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 电脑端 & 手机端共用：点击卡片后 3D 翻转展开变大的详情弹窗 -->
+<div class="pass-detail-backdrop" id="passDetailBackdrop">
+  <div class="pass-detail-modal" id="passDetailModal" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- 手机端：从上往下排列、丝滑流畅的全屏卡片栈 -->
+<div class="wallet-overlay" id="walletOverlay">
+  <button class="btn-wallet-close" id="closeWalletBtn" type="button" title="Back to Folders">✕</button>
+
+  <div class="wallet-cards-stack" id="walletCardsStack"></div>
+
+  <a href="marketplace.html" class="wallet-bottom-link">Explore more shows in Marketplace →</a>
+</div>
+
+<!-- 通用两步链上交易进度弹窗（治理异议 / 转售上架 / 取消转售 共用） -->
+<div class="tx-modal-backdrop" id="objectionModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="txModalTitle">
+    <h3 class="tx-modal-title" id="txModalTitle">Object to organizer payout</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="step1Text">Confirm your objection in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="step1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="step2Text">Record your vote</span>
+        </div>
+        <span class="tx-step-status" id="step2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="txModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<script src="js/customer_my_ticket.js"></script>
+</body>
+</html>
