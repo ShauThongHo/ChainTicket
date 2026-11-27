@@ -26,3 +26,17 @@ export function gatewayUrl(uri: string, preferredGateway?: string) {
   if (ipfsPath?.[1]) return `${base}/ipfs/${ipfsPath[1]}`;
   return uri;
 }
+
+/** Preserves existing HTTPS poster URLs (e.g. Pinata gateway) and only rewrites ipfs:// URIs. */
+export function resolvePosterUrl(rawUrl: string, preferredGateway?: string) {
+  const clean = rawUrl.trim();
+  if (!clean) return "";
+  if (clean.startsWith("ipfs://")) {
+    const cid = clean.slice(7).replace(/^ipfs\//, "");
+    const base = (preferredGateway || "https://gateway.pinata.cloud")
+      .replace(/\/+$/, "")
+      .replace(/\/ipfs$/i, "");
+    return `${base}/ipfs/${cid}`;
+  }
+  return clean;
+}

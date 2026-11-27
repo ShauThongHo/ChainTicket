@@ -55,8 +55,8 @@ function HomePage() {
   const featured = overview?.featured ?? null;
   const activity = overview?.latestActivity ?? null;
 
-  const ticketCardContent = (
-    <div className="holo-ticket">
+  const ticketInnerContent = (
+    <>
       <div className="ticket-banner">
         <div className="banner-top">
           <span className="pass-id">
@@ -148,7 +148,7 @@ function HomePage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 
   return (
@@ -211,15 +211,15 @@ function HomePage() {
         <div className="hero-right">
           {featured ? (
             <Link
-              to="/events/$eventId"
-              params={{ eventId: String(featured.id) }}
-              className="holo-ticket-link"
+              to="/marketplace"
+              search={{ eventId: featured.id }}
+              className="holo-ticket"
             >
-              {ticketCardContent}
+              {ticketInnerContent}
             </Link>
           ) : (
-            <Link to="/marketplace" className="holo-ticket-link">
-              {ticketCardContent}
+            <Link to="/marketplace" className="holo-ticket">
+              {ticketInnerContent}
             </Link>
           )}
         </div>

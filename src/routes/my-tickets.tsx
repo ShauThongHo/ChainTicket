@@ -1,78 +1,391 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import {
-  Calendar,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  Lock,
-  MapPin,
-  QrCode,
-  Tag,
-  Ticket,
-  Vote,
-  Wallet,
-} from "lucide-react";
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { toast } from "sonner";
-import { PhaseBadge } from "@/components/phase-badge";
+import { FaucetClaimButton } from "@/components/faucet-claim";
 import { PublicDarkShell } from "@/components/public-dark-shell";
 import { useSession } from "@/components/session";
 import { ChainDialog, useChainRun } from "@/components/tx-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import artifacts from "@/lib/abi/core.json";
 import { cancelListing, confirmVote, fetchMyTickets, fetchQr, quoteList, sellTicket } from "@/lib/api";
 import { friendlyChainError } from "@/lib/chain-errors";
-import { explorerToken, gatewayUrl } from "@/lib/explorer";
+import { explorerToken, gatewayUrl, resolvePosterUrl } from "@/lib/explorer";
 import { updateActiveChainRun } from "@/lib/tx-state";
 import type { MyTicket, QrPayload } from "@/lib/types";
 import { formatAmount, paySymbol, priceBounds } from "@/lib/utils";
 
 export const Route = createFileRoute("/my-tickets")({ component: MyTicketsPage });
 
-function MyTicketsPage() {
-  const { me, config } = useSession();
-  const [tickets, setTickets] = useState<MyTicket[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "active" | "listed" | "past">("all");
-  const symbol = paySymbol(config);
+const THEMES = ["emerald", "amber", "crimson", "cyan", "violet"] as const;
+const LOOP_STRIDE = 300;
+const CARD_WIDTH = 280;
 
-  async function reload() {
-    const rows = await fetchMyTickets();
-    setTickets(rows);
+type FolderKind = "unused" | "used";
+
+function themeForTicket(eventId: number) {
+  return THEMES[Math.abs(eventId) % THEMES.length];
+}
+
+function isPastTicket(t: MyTicket) {
+  return t.status === "used" || t.status === "refunded" || t.phase === "ended" || t.phase === "cancelled";
+}
+
+function ticketStatusInfo(t: MyTicket) {
+  if (t.status === "listed") return { label: "Listed", badgeClass: "listed" };
+  if (t.status === "used") return { label: "Used", badgeClass: "ended" };
+  if (t.status === "refunded") return { label: "Refunded", badgeClass: "danger" };
+  if (t.phase === "cancelled") return { label: "Cancelled", badgeClass: "danger" };
+  if (t.phase === "ended") return { label: "Ended", badgeClass: "ended" };
+  return { label: "Active", badgeClass: "active" };
+}
+
+function ticketArtCaption(t: MyTicket) {
+  if (t.status === "listed") return "SECONDARY POOL · ESCROWED";
+  if (t.status === "used") return "CHECKED IN · ARCHIVED";
+  if (t.status === "refunded") return "REFUNDED · SETTLED";
+  if (t.phase === "cancelled") return "EVENT CANCELLED";
+  if (t.phase === "ended") return "NFT PASS · ADMIT ONE";
+  return `${t.tierName.toUpperCase()} · GATE PASS`;
+}
+
+function ticketDisplayPrice(t: MyTicket, symbol: string) {
+  if (t.status === "listed" && t.listPriceCents != null) {
+    return formatAmount(t.listPriceCents, symbol);
+  }
+  return formatAmount(t.faceCents, symbol);
+}
+
+function computeCardFlipTransform(
+  cardEl: HTMLElement | null,
+  modalEl: HTMLElement | null,
+  rotX = -16,
+  rotY = 14,
+) {
+  if (!cardEl || !modalEl) {
+    return `perspective(1200px) translate3d(0px, 24px, 0px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(0.62)`;
+  }
+  const src = cardEl.getBoundingClientRect();
+  const dst = modalEl.getBoundingClientRect();
+  if (!dst.width || !dst.height) {
+    return `perspective(1200px) translate3d(0px, 24px, 0px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(0.62)`;
   }
 
-  useEffect(() => {
-    if (me) void reload();
-  }, [me]);
+  const srcCx = src.left + src.width / 2;
+  const srcCy = src.top + src.height / 2;
+  const dstCx = dst.left + dst.width / 2;
+  const dstCy = dst.top + dst.height / 2;
+
+  const dx = srcCx - dstCx;
+  const dy = srcCy - dstCy;
+  const uniformScale = Math.max(
+    0.42,
+    Math.min(0.75, (src.width / dst.width + src.height / dst.height) / 2),
+  );
+
+  return `perspective(1200px) translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(${uniformScale.toFixed(3)})`;
+}
+
+function MyTicketsPage() {
+  const { me, config } = useSession();
+  const chain = useChainRun();
+  const [tickets, setTickets] = useState<MyTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const symbol = paySymbol(config);
+
+  const [openFolder, setOpenFolder] = useState<FolderKind | null>(null);
+  const [animatePopKey, setAnimatePopKey] = useState(0);
+  const [mobileOverlayOpen, setMobileOverlayOpen] = useState(false);
+
+  const [inspectedTicketId, setInspectedTicketId] = useState<number | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const lastClickedCardRef = useRef<HTMLElement | null>(null);
+  const detailCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Desktop carousel refs (60fps imperative loop + mouse left/right drag without text highlight)
+  const desktopViewportRef = useRef<HTMLDivElement | null>(null);
+  const loopCardRefs = useRef<(HTMLElement | null)[]>([]);
+  const loopScrollXRef = useRef(0);
+  const isLoopPausedRef = useRef(false);
+  const isLoopDraggingRef = useRef(false);
+  const wasLoopDraggedRef = useRef(false);
+  const dragPointerButtonRef = useRef(0);
+  const suppressNextContextMenuRef = useRef(false);
+  const loopDragStartXRef = useRef(0);
+  const loopDragStartScrollRef = useRef(0);
+
+  const [walletLayoutVars, setWalletLayoutVars] = useState({ cardH: 235, overlap: -110 });
+
+  const reload = useCallback(async () => {
+    try {
+      const rows = await fetchMyTickets();
+      setTickets(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!me) return;
+    if (!me) {
+      setTickets([]);
+      setOpenFolder(null);
+      setMobileOverlayOpen(false);
+      setInspectedTicketId(null);
+      setDetailModalOpen(false);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void reload();
     const id = setInterval(() => void reload(), 5000);
     return () => clearInterval(id);
-  }, [me]);
+  }, [me, reload]);
 
-  const upcomingCount = tickets.filter((t) => t.status === "owned" && t.phase === "active").length;
-  const listedCount = tickets.filter((t) => t.status === "listed").length;
-  const usedCount = tickets.filter(
-    (t) => t.status === "used" || t.status === "refunded" || t.phase === "ended",
-  ).length;
+  const unusedPasses = useMemo(() => tickets.filter((t) => !isPastTicket(t)), [tickets]);
+  const usedPasses = useMemo(() => tickets.filter(isPastTicket), [tickets]);
+  const activeFolderTickets = useMemo(() => {
+    if (openFolder === "unused") return unusedPasses;
+    if (openFolder === "used") return usedPasses;
+    return [];
+  }, [openFolder, unusedPasses, usedPasses]);
 
-  const filteredTickets = useMemo(() => {
-    return tickets.filter((t) => {
-      if (activeTab === "active") return t.status === "owned" && t.phase === "active";
-      if (activeTab === "listed") return t.status === "listed";
-      if (activeTab === "past")
-        return t.status === "used" || t.status === "refunded" || t.phase === "ended";
-      return true;
-    });
-  }, [tickets, activeTab]);
+  const inspectedTicket = useMemo(
+    () => tickets.find((t) => t.id === inspectedTicketId) ?? null,
+    [tickets, inspectedTicketId],
+  );
+
+  // Desktop marquee repeats >= 2 items to >= 6 slots like the prototype; 1 item stays centered cleanly
+  const desktopDisplayCards = useMemo(() => {
+    if (activeFolderTickets.length === 0) return [];
+    if (activeFolderTickets.length === 1) return [activeFolderTickets[0]];
+    const repeated: MyTicket[] = [];
+    while (repeated.length < 6) {
+      repeated.push(...activeFolderTickets);
+    }
+    return repeated;
+  }, [activeFolderTickets]);
+
+  const shouldLoopScroll = desktopDisplayCards.length >= 4;
+
+  // Reset scroll offset on intentional folder open / switch, preserving offset during 5s polling
+  useEffect(() => {
+    loopScrollXRef.current = 0;
+  }, [animatePopKey]);
+
+  // Mobile card stack geometry calculation
+  const syncMobileWalletVars = useCallback((count: number) => {
+    if (typeof window === "undefined") return;
+    const availableH = Math.max(460, window.innerHeight - 124);
+    const cardH = Math.min(265, Math.max(205, Math.round(availableH * 0.43)));
+    let step = count > 1 ? Math.floor((availableH - cardH) / (count - 1)) : 0;
+    step = Math.min(cardH - 22, Math.max(82, step));
+    const overlap = count > 1 ? -(cardH - step) : 0;
+    setWalletLayoutVars({ cardH, overlap });
+  }, []);
+
+  useEffect(() => {
+    if (!mobileOverlayOpen) return;
+    syncMobileWalletVars(activeFolderTickets.length);
+    const onResize = () => syncMobileWalletVars(activeFolderTickets.length);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [mobileOverlayOpen, activeFolderTickets.length, syncMobileWalletVars]);
+
+  // Continuous 60fps desktop loop animation
+  useEffect(() => {
+    if (!me || !openFolder || desktopDisplayCards.length === 0) return;
+
+    let rafId = 0;
+    const totalWidth = desktopDisplayCards.length * LOOP_STRIDE;
+
+    function updatePositions() {
+      const vpWidth = desktopViewportRef.current?.clientWidth || 1120;
+      if (shouldLoopScroll && !isLoopPausedRef.current && !isLoopDraggingRef.current) {
+        loopScrollXRef.current += 0.55;
+      }
+
+      const contentWidth =
+        desktopDisplayCards.length === 1
+          ? CARD_WIDTH
+          : totalWidth;
+      const centerOffset = Math.max(0, (vpWidth - contentWidth) / 2);
+
+      loopCardRefs.current.forEach((card, i) => {
+        if (!card) return;
+        let x: number;
+        if (shouldLoopScroll) {
+          x = i * LOOP_STRIDE - loopScrollXRef.current;
+          x = ((x % totalWidth) + totalWidth) % totalWidth;
+          if (x > totalWidth - LOOP_STRIDE) {
+            x -= totalWidth;
+          }
+        } else {
+          x = i * LOOP_STRIDE;
+        }
+        card.style.transform = `translate3d(${(x + centerOffset).toFixed(1)}px, 0, 0)`;
+      });
+    }
+
+    function tick() {
+      updatePositions();
+      rafId = requestAnimationFrame(tick);
+    }
+
+    updatePositions();
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [me, openFolder, desktopDisplayCards.length, shouldLoopScroll]);
+
+  // Desktop viewport drag (left & right mouse buttons without highlight) & horizontal wheel
+  useEffect(() => {
+    const viewport = desktopViewportRef.current;
+    if (!viewport || !me) return;
+
+    function onPointerDown(e: PointerEvent) {
+      if (!shouldLoopScroll) return;
+      if (e.pointerType === "mouse") {
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+      }
+      isLoopDraggingRef.current = true;
+      wasLoopDraggedRef.current = false;
+      suppressNextContextMenuRef.current = false;
+      dragPointerButtonRef.current = e.button;
+      loopDragStartXRef.current = e.clientX;
+      loopDragStartScrollRef.current = loopScrollXRef.current;
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!isLoopDraggingRef.current) return;
+      const dx = e.clientX - loopDragStartXRef.current;
+      if (Math.abs(dx) > 5) {
+        wasLoopDraggedRef.current = true;
+        if (dragPointerButtonRef.current === 2) {
+          suppressNextContextMenuRef.current = true;
+        }
+      }
+      loopScrollXRef.current = loopDragStartScrollRef.current - dx;
+    }
+
+    function onPointerUp() {
+      isLoopDraggingRef.current = false;
+    }
+
+    function onContextMenu(e: MouseEvent) {
+      if (suppressNextContextMenuRef.current || isLoopDraggingRef.current) {
+        e.preventDefault();
+        suppressNextContextMenuRef.current = false;
+      }
+    }
+
+    function onWheel(e: WheelEvent) {
+      if (!shouldLoopScroll) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        loopScrollXRef.current += e.deltaX;
+      }
+    }
+
+    viewport.addEventListener("pointerdown", onPointerDown);
+    viewport.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("blur", onPointerUp);
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      viewport.removeEventListener("pointerdown", onPointerDown);
+      viewport.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("blur", onPointerUp);
+      viewport.removeEventListener("wheel", onWheel);
+    };
+  }, [me, shouldLoopScroll]);
+
+  const closeDetailModal = useCallback(() => {
+    if (!detailModalOpen) return;
+    if (detailCloseTimerRef.current) clearTimeout(detailCloseTimerRef.current);
+    setDetailModalOpen(false);
+    isLoopPausedRef.current = false;
+    detailCloseTimerRef.current = setTimeout(() => {
+      setInspectedTicketId(null);
+    }, 340);
+  }, [detailModalOpen]);
+
+  const openDetailModal = useCallback((ticketId: number, cardEl: HTMLElement | null) => {
+    if (detailCloseTimerRef.current) clearTimeout(detailCloseTimerRef.current);
+    lastClickedCardRef.current = cardEl;
+    isLoopPausedRef.current = true;
+    setInspectedTicketId(ticketId);
+    setDetailModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (detailCloseTimerRef.current) clearTimeout(detailCloseTimerRef.current);
+    };
+  }, []);
+
+  // Escape closes top overlay cleanly unless a ChainDialog transaction is open
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape" || chain.open) return;
+      if (detailModalOpen) {
+        closeDetailModal();
+      } else {
+        setMobileOverlayOpen(false);
+        setOpenFolder(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [chain.open, detailModalOpen, closeDetailModal]);
+
+  function openDesktopFolder(folderType: FolderKind) {
+    setOpenFolder(folderType);
+    setAnimatePopKey((k) => k + 1);
+  }
+
+  function handleFolderClick(folderType: FolderKind) {
+    const isDesktop = typeof window !== "undefined" ? window.innerWidth >= 821 : true;
+    if (isDesktop) {
+      if (openFolder) {
+        openDesktopFolder(openFolder === "unused" ? "used" : "unused");
+        return;
+      }
+      openDesktopFolder(folderType);
+    } else {
+      const targetList = folderType === "unused" ? unusedPasses : usedPasses;
+      syncMobileWalletVars(targetList.length);
+      setOpenFolder(folderType);
+      requestAnimationFrame(() => setMobileOverlayOpen(true));
+    }
+  }
+
+  function closeDesktopFan() {
+    setOpenFolder(null);
+  }
+
+  function closeMobileOverlay() {
+    setMobileOverlayOpen(false);
+  }
 
   if (!me) {
     return (
-      <PublicDarkShell>
+      <PublicDarkShell
+      navRightPrefix={<FaucetClaimButton chain={chain} />}
+      mobileMenuExtra={<FaucetClaimButton chain={chain} mobile />}
+    >
         <main className="vault-shell">
           <section className="glass-vault-panel">
             <div className="wallet-icon-box">
@@ -99,201 +412,448 @@ function MyTicketsPage() {
     );
   }
 
+  const desktopFolderLabel =
+    openFolder === "unused"
+      ? `Unused Passes (${unusedPasses.length}) · Click any pass to inspect`
+      : `Used & History (${usedPasses.length}) · Click any pass to inspect`;
+
   return (
-    <PublicDarkShell>
-      <main className="vault-shell-auth">
-        {/* DIGITAL PASSBOOK HEADER */}
-        <div className="mb-8 border-b border-border pb-6">
-          <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-fg">
-            Ticket Vault
+    <PublicDarkShell
+      navRightPrefix={<FaucetClaimButton chain={chain} />}
+      mobileMenuExtra={<FaucetClaimButton chain={chain} mobile />}
+    >
+      <main
+        className={`archive-stage${openFolder && !mobileOverlayOpen ? " desktop-folder-open" : ""}`}
+        id="archiveStage"
+        onDragStart={(e) => e.preventDefault()}
+      >
+        <div className="archive-hero-header">
+          <div className="kicker-pill">
+            Encrypted On-Chain Vault ·{" "}
+            <span>
+              {loading
+                ? "Syncing Passes..."
+                : `${tickets.length} Verified Pass${tickets.length === 1 ? "" : "es"}`}
+            </span>
+          </div>
+          <h1 className="archive-title">
+            Ticket <em>Archive</em>
           </h1>
-
-          {/* STATS OVERVIEW CARDS */}
-          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <StatCard
-              label="Total Passes"
-              value={String(tickets.length)}
-              icon={<Ticket className="size-4 text-primary" />}
-            />
-            <StatCard
-              label="Ready for Entry"
-              value={String(upcomingCount)}
-              icon={<QrCode className="size-4 text-success" />}
-            />
-            <StatCard
-              label="Listed for Resale"
-              value={String(listedCount)}
-              icon={<Tag className="size-4 text-sage" />}
-            />
-            <StatCard
-              label="Spendable Balance"
-              value={formatAmount(me.spendableCents, symbol)}
-              icon={<Wallet className="size-4 text-primary" />}
-            />
-          </div>
+          <p className="archive-subtitle">
+            Select a folder below to inspect your unused gate passes or review past show history and
+            organizer payout governance.
+          </p>
         </div>
 
-        {/* FILTER TABS */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-bg-elevated p-1 text-xs">
+        {/* Desktop Carousel Fan Stage */}
+        <section className="desktop-fan-stage" id="desktopFanStage">
+          <div className="desktop-fan-toolbar">
+            <span className="desktop-folder-badge" id="desktopFolderLabel">
+              {desktopFolderLabel}
+            </span>
             <button
+              className="btn-desktop-collapse"
+              id="desktopCollapseBtn"
               type="button"
-              onClick={() => setActiveTab("all")}
-              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-                activeTab === "all"
-                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
-                  : "text-muted hover:text-fg"
-              }`}
+              onClick={closeDesktopFan}
             >
-              All Passes ({tickets.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("active")}
-              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-                activeTab === "active"
-                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              Entry Ready ({upcomingCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("listed")}
-              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-                activeTab === "listed"
-                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              Listed ({listedCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("past")}
-              className={`rounded-md px-3.5 py-1.5 font-medium transition-colors ${
-                activeTab === "past"
-                  ? "bg-primary text-primary-fg shadow-2xs font-semibold"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              History ({usedCount})
+              ↓ Return to Folders
             </button>
           </div>
 
-          <Link
-            to="/marketplace"
-            className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
+          <div
+            ref={desktopViewportRef}
+            className={`desktop-carousel-viewport${desktopDisplayCards.length === 0 ? " is-empty-track" : ""}`}
+            id="desktopCarouselViewport"
+            onMouseEnter={() => {
+              isLoopPausedRef.current = true;
+            }}
+            onMouseLeave={() => {
+              if (!detailModalOpen) isLoopPausedRef.current = false;
+              isLoopDraggingRef.current = false;
+            }}
           >
-            <span>Find more shows</span>
-            <span>→</span>
-          </Link>
-        </div>
-
-        {/* TICKET PASS LISTINGS */}
-        <div className="grid gap-6">
-          {filteredTickets.length === 0 ? (
-            <div className="glass-vault-panel !min-h-[260px] !py-10">
-              <Ticket className="size-10 text-primary/70 mx-auto mb-3 stroke-[1.5]" />
-              <h3 className="font-display text-xl font-bold text-fg">No tickets in this section</h3>
-              <p className="mt-1 text-sm text-muted max-w-sm mx-auto">
-                {activeTab === "all"
-                  ? "You have not purchased any event tickets yet."
-                  : `You currently have no tickets matching the "${activeTab}" filter.`}
-              </p>
-              {activeTab === "all" ? (
-                <Link to="/marketplace" className="btn-browse-shows mt-5">
-                  Explore Shows →
+            {desktopDisplayCards.length === 0 ? (
+              <div className="archive-empty-track">
+                <p className="text-sm text-white/65">
+                  {loading
+                    ? "Loading your passes..."
+                    : openFolder === "unused"
+                      ? "You do not have any upcoming or active passes yet."
+                      : "You do not have any past or used passes yet."}
+                </p>
+                <Link to="/marketplace" className="folder-action-pill">
+                  Explore Marketplace →
                 </Link>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => setActiveTab("all")}
-                >
-                  Show All Passes
-                </Button>
-              )}
+              </div>
+            ) : (
+              <div className="desktop-carousel-track" id="desktopCarouselTrack">
+                {desktopDisplayCards.map((item, idx) => {
+                  const { label } = ticketStatusInfo(item);
+                  return (
+                    <article
+                      key={`${openFolder}-${item.id}-${idx}-${animatePopKey}`}
+                      ref={(el) => {
+                        loopCardRefs.current[idx] = el;
+                      }}
+                      className={`desktop-loop-card${animatePopKey > 0 ? " popping-out" : ""}`}
+                      data-theme={themeForTicket(item.eventId)}
+                      data-key={`${item.id}`}
+                      style={{ animationDelay: `${Math.min(idx, 4) * 0.06}s` }}
+                      onClick={(e) => {
+                        if (wasLoopDraggedRef.current) return;
+                        openDetailModal(item.id, e.currentTarget);
+                      }}
+                    >
+                      <div className="folder-halftone" />
+                      <div>
+                        <div className="wcard-header">
+                          <div>
+                            <div className="wcard-brand">
+                              NFT #{item.chainId ?? item.serial} · {label}
+                            </div>
+                            <h3 className="wcard-title">{item.eventName}</h3>
+                          </div>
+                          <span className="wcard-tier-pill">{item.tierName}</span>
+                        </div>
+
+                        <div className="wcard-sub-meta">
+                          <span>📅 {new Date(item.startsAt).toLocaleString()}</span>
+                        </div>
+                        <div className="wcard-sub-meta">
+                          <span>📍 {item.venue || "TBA"}</span>
+                        </div>
+                      </div>
+
+                      <div className="compact-card-footer">
+                        <strong style={{ color: "#ffffff" }}>
+                          {ticketDisplayPrice(item, symbol)}
+                        </strong>
+                        <span className="compact-inspect-cue">Details ↗</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <svg className="fan-beams-svg" viewBox="0 0 960 64" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="beamGradL" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#6ee7b7" stopOpacity="0.06" />
+              </linearGradient>
+              <linearGradient id="beamGradR" x1="1" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#6ee7b7" stopOpacity="0.06" />
+              </linearGradient>
+            </defs>
+            <line
+              x1="120"
+              y1="2"
+              x2="290"
+              y2="62"
+              stroke="url(#beamGradL)"
+              strokeWidth="1.5"
+              strokeDasharray="5 4"
+            />
+            <line
+              x1="840"
+              y1="2"
+              x2="670"
+              y2="62"
+              stroke="url(#beamGradR)"
+              strokeWidth="1.5"
+              strokeDasharray="5 4"
+            />
+          </svg>
+        </section>
+
+        {/* Two Stacked Frosted Folders */}
+        <section className="folders-stack-container">
+          <div
+            className={`file-folder folder-unused${openFolder === "unused" && !mobileOverlayOpen ? " is-active-folder" : ""}`}
+            id="folderUnused"
+            onClick={() => handleFolderClick("unused")}
+          >
+            <div className="folder-tab-row">
+              <div className="folder-tab">
+                <span>Unused Passes</span>
+                <span className="tab-count-pill" id="unusedCountBadge">
+                  {unusedPasses.length}
+                </span>
+              </div>
+            </div>
+            <div className="folder-body">
+              <div className="folder-halftone" />
+              <div className="folder-info-left">
+                <h2 className="folder-heading">Active &amp; Upcoming Passes</h2>
+                <p className="folder-desc">
+                  Valid ERC-721 event tickets ready for venue gate scanning with HMAC-SHA256
+                  rotating QR codes or verified resale listing.
+                </p>
+              </div>
+              <button
+                className="folder-action-pill"
+                id="unusedHintPill"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth >= 821 &&
+                    openFolder !== null
+                  ) {
+                    openDesktopFolder("used");
+                  } else {
+                    handleFolderClick("unused");
+                  }
+                }}
+              >
+                {openFolder && !mobileOverlayOpen ? "Switch to Used & History ⇄" : "Open Passes →"}
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={`file-folder folder-used${openFolder === "used" && !mobileOverlayOpen ? " is-active-folder" : ""}`}
+            id="folderUsed"
+            onClick={() => handleFolderClick("used")}
+          >
+            <div className="folder-tab-row">
+              <div className="folder-tab">
+                <span>Used &amp; History</span>
+                <span className="tab-count-pill" id="usedCountBadge">
+                  {usedPasses.length}
+                </span>
+              </div>
+            </div>
+            <div className="folder-body">
+              <div className="folder-halftone" />
+              <div className="folder-info-left">
+                <h2 className="folder-heading">Past Events &amp; Payout Governance</h2>
+                <p className="folder-desc">
+                  Completed event stubs, locked gate passes, and active organizer payout proposals
+                  open for attendee objection voting.
+                </p>
+              </div>
+              <button
+                className="folder-action-pill"
+                id="usedHintPill"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth >= 821 &&
+                    openFolder !== null
+                  ) {
+                    openDesktopFolder("unused");
+                  } else {
+                    handleFolderClick("used");
+                  }
+                }}
+              >
+                {openFolder && !mobileOverlayOpen
+                  ? "Switch to Unused Passes ⇄"
+                  : "Open Passes →"}
+              </button>
+
+              <div className="folder-footer-strip">
+                <span>HMAC-SHA256 VERIFIED ARCHIVE</span>
+                <span>{config?.chainName ? `${config.chainName.toUpperCase()} / ${symbol}` : "GNOSIS / DxDAI L2"}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Mobile Fullscreen Card Stack Overlay */}
+      <div
+        className={`wallet-overlay${mobileOverlayOpen ? " open" : ""}`}
+        id="walletOverlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeMobileOverlay();
+        }}
+      >
+        <button
+          className="btn-wallet-close"
+          id="closeWalletBtn"
+          type="button"
+          title="Back to Folders"
+          onClick={closeMobileOverlay}
+        >
+          ✕
+        </button>
+
+        <div
+          className="wallet-cards-stack"
+          id="walletCardsStack"
+          style={
+            {
+              "--wallet-card-h": `${walletLayoutVars.cardH}px`,
+              "--wallet-overlap": `${walletLayoutVars.overlap}px`,
+            } as CSSProperties
+          }
+        >
+          {mobileOverlayOpen && activeFolderTickets.length === 0 ? (
+            <div className="archive-empty-track my-auto max-h-[260px]">
+              <p className="text-sm text-white/65">
+                {loading
+                  ? "Loading your passes..."
+                  : openFolder === "unused"
+                    ? "You do not have any unused passes yet."
+                    : "You do not have any past event passes yet."}
+              </p>
             </div>
           ) : (
-            filteredTickets.map((t) => (
-              <TicketPassCard key={t.id} ticket={t} onChange={() => void reload()} />
-            ))
+            activeFolderTickets.map((item, index) => {
+              const { label } = ticketStatusInfo(item);
+              return (
+                <article
+                  key={`mobile-${openFolder}-${item.id}`}
+                  className="wallet-pass-card"
+                  data-theme={themeForTicket(item.eventId)}
+                  data-key={`${item.id}`}
+                  style={{ animationDelay: `${index * 0.045}s` }}
+                  onClick={(e) => openDetailModal(item.id, e.currentTarget)}
+                >
+                  <div className="folder-halftone" />
+                  <div>
+                    <div className="wcard-header">
+                      <div>
+                        <div className="wcard-brand">
+                          NFT #{item.chainId ?? item.serial} · {label}
+                        </div>
+                        <h3 className="wcard-title">{item.eventName}</h3>
+                      </div>
+                      <span className="wcard-tier-pill">{item.tierName}</span>
+                    </div>
+
+                    <div className="wcard-sub-meta">
+                      <span>📅 {new Date(item.startsAt).toLocaleString()}</span>
+                    </div>
+                    <div className="wcard-sub-meta">
+                      <span>📍 {item.venue || "TBA"}</span>
+                    </div>
+                  </div>
+
+                  <div className="wcard-compact-footer">
+                    <strong style={{ color: "#ffffff" }}>
+                      {ticketDisplayPrice(item, symbol)}
+                    </strong>
+                    <span className="wcard-inspect-cue">Details ↗</span>
+                  </div>
+                </article>
+              );
+            })
           )}
         </div>
-      </main>
+
+        <Link to="/marketplace" className="wallet-bottom-link">
+          Explore more shows in Marketplace →
+        </Link>
+      </div>
+
+      {/* 3D Flip Pass Detail Modal */}
+      <PassDetailModal
+        ticket={inspectedTicket}
+        open={detailModalOpen}
+        anchorCardRef={lastClickedCardRef}
+        symbol={symbol}
+        explorer={config?.explorerUrl ?? ""}
+        ipfsGateway={config?.ipfsGateway}
+        chain={chain}
+        onChanged={() => void reload()}
+        onClose={closeDetailModal}
+      />
+
+      <ChainDialog {...chain} onClose={chain.close} />
     </PublicDarkShell>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
+function PassDetailModal({
+  ticket,
+  open,
+  anchorCardRef,
+  symbol,
+  explorer,
+  ipfsGateway,
+  chain,
+  onChanged,
+  onClose,
 }: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
+  ticket: MyTicket | null;
+  open: boolean;
+  anchorCardRef: React.RefObject<HTMLElement | null>;
+  symbol: string;
+  explorer: string;
+  ipfsGateway?: string;
+  chain: ReturnType<typeof useChainRun>;
+  onChanged: () => void;
+  onClose: () => void;
 }) {
-  return (
-    <Card className="p-4 rounded-xl bg-bg-elevated/85 backdrop-blur-md border-border flex flex-col justify-between">
-      <div className="flex items-center justify-between text-muted">
-        <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
-        {icon}
-      </div>
-      <div className="mt-2">
-        <p className="font-mono text-2xl font-bold tabular-nums text-fg">{value}</p>
-        {sub ? <span className="text-[11px] font-mono text-muted">{sub}</span> : null}
-      </div>
-    </Card>
-  );
-}
+  const { sendUserCall } = useSession();
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const resellInputRef = useRef<HTMLInputElement | null>(null);
 
-function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () => void }) {
-  const { sendUserCall, config } = useSession();
-  const bounds = priceBounds(ticket.faceCents);
-  const [price, setPrice] = useState(((bounds.min + bounds.max) / 2 / 100).toFixed(2));
+  const [art, setArt] = useState("");
   const [qr, setQr] = useState<QrPayload | null>(null);
-  const [img, setImg] = useState<string | null>(null);
-  const [art, setArt] = useState(ticket.posterUrl || "");
+  const [qrImg, setQrImg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [showResaleDrawer, setShowResaleDrawer] = useState(false);
-  const chain = useChainRun();
-  const symbol = paySymbol(config);
-  const live = ticket.phase === "active";
-  const explorer = config?.explorerUrl ?? "";
-  const market = ticket.marketplaceAddress || "";
 
+  const [isResellOpen, setIsResellOpen] = useState(false);
+  const [resellPrice, setResellPrice] = useState("");
+
+  const ticketId = ticket?.id ?? null;
+  const posterUrl = ticket?.posterUrl ?? "";
+  const tokenUri = ticket?.tokenUri ?? null;
+  const ticketStatus = ticket?.status ?? null;
+  const ticketPhase = ticket?.phase ?? null;
+
+  // Resolve poster artwork (from posterUrl or decentralized metadata) for Detail Modal only
   useEffect(() => {
-    if (!ticket.tokenUri) return;
+    if (ticketId === null) {
+      setArt("");
+      return;
+    }
+    const direct = resolvePosterUrl(posterUrl, ipfsGateway);
+    setArt(direct);
+    if (direct || !tokenUri) return;
+
     let stop = false;
-    fetch(gatewayUrl(ticket.tokenUri, config?.ipfsGateway))
+    fetch(gatewayUrl(tokenUri, ipfsGateway))
       .then((r) => r.json())
       .then((json: { image?: string }) => {
         if (stop || typeof json.image !== "string" || !json.image) return;
-        setArt(gatewayUrl(json.image, config?.ipfsGateway));
+        setArt(resolvePosterUrl(json.image, ipfsGateway));
       })
       .catch(() => undefined);
     return () => {
       stop = true;
     };
-  }, [ticket.tokenUri, config?.ipfsGateway]);
+  }, [ticketId, posterUrl, tokenUri, ipfsGateway]);
 
+  // Dynamic QR polling while modal is open for active owned tickets
   useEffect(() => {
+    if (ticketId === null || !open || ticketStatus !== "owned" || ticketPhase !== "active") {
+      setQr(null);
+      setQrImg(null);
+      return;
+    }
     let stop = false;
+    const currentTicketId = ticketId;
     async function tick() {
       try {
-        const data = await fetchQr({ data: { ticketId: ticket.id } });
+        const data = await fetchQr({ data: { ticketId: currentTicketId } });
         if (stop) return;
         setQr(data);
         if (data.payload) {
-          setImg(await QRCode.toDataURL(data.payload, { margin: 1, width: 280 }));
+          setQrImg(await QRCode.toDataURL(data.payload, { margin: 1, width: 280 }));
         } else {
-          setImg(null);
+          setQrImg(null);
         }
       } catch {
         if (!stop) setQr(null);
@@ -305,7 +865,41 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
       stop = true;
       clearInterval(id);
     };
-  }, [ticket.id, ticket.status]);
+  }, [ticketId, ticketStatus, ticketPhase, open]);
+
+  // Reset resell inline state when inspecting a different pass
+  useEffect(() => {
+    setIsResellOpen(false);
+    setResellPrice("");
+  }, [ticketId, open]);
+
+  // 3D FLIP entrance & exit transition anchored to clicked card
+  useLayoutEffect(() => {
+    const modal = modalRef.current;
+    if (!modal || ticketId === null) return;
+
+    if (open) {
+      modal.style.transition = "none";
+      modal.style.transform = computeCardFlipTransform(anchorCardRef.current, modal, -18, 16);
+      modal.style.opacity = "0";
+      void modal.offsetHeight;
+
+      const rafId = requestAnimationFrame(() => {
+        modal.style.transition =
+          "transform 0.44s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1)";
+        modal.style.transform =
+          "perspective(1200px) translate3d(0px, 0px, 0px) rotateX(0deg) rotateY(0deg) scale(1)";
+        modal.style.opacity = "1";
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+
+    const endTransform = computeCardFlipTransform(anchorCardRef.current, modal, 14, -14);
+    modal.style.transition =
+      "transform 0.32s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.24s ease";
+    modal.style.transform = endTransform;
+    modal.style.opacity = "0";
+  }, [open, ticketId, anchorCardRef]);
 
   const unlockLabel = useMemo(() => {
     if (!qr?.unlocksAt) return null;
@@ -316,30 +910,71 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
     return `Unlocks in ${h}h ${m}m`;
   }, [qr]);
 
-  async function list() {
+  if (!ticket) {
+    return (
+      <div className="pass-detail-backdrop" id="passDetailBackdrop">
+        <div className="pass-detail-modal" id="passDetailModal" ref={modalRef} role="dialog" aria-modal="true" />
+      </div>
+    );
+  }
+
+  const bounds = priceBounds(ticket.faceCents);
+  const minDx = +(bounds.min / 100).toFixed(2);
+  const maxDx = +(bounds.max / 100).toFixed(2);
+  const faceDx = +(ticket.faceCents / 100).toFixed(2);
+
+  const numericResell = parseFloat(resellPrice);
+  const parsedCents = Math.round(numericResell * 100);
+  const isResellValid =
+    Number.isFinite(numericResell) && parsedCents >= bounds.min && parsedCents <= bounds.max;
+  const isMinusActive = isResellValid && Math.abs(numericResell - minDx) < 0.005;
+  const isFaceActive = isResellValid && Math.abs(numericResell - faceDx) < 0.005;
+  const isPlusActive = isResellValid && Math.abs(numericResell - maxDx) < 0.005;
+
+  const live = ticket.phase === "active";
+  const market = ticket.marketplaceAddress || "";
+  const { label: statusLabel, badgeClass } = ticketStatusInfo(ticket);
+  const canVote =
+    ticket.proposal?.status === "pending_vote" &&
+    !ticket.proposal.hasVoted &&
+    (ticket.status === "owned" || ticket.status === "listed" || ticket.status === "used");
+  const opposing = ticket.engineVersion >= 4;
+
+  function openResellForm() {
+    setIsResellOpen(true);
+    setResellPrice(faceDx.toFixed(2));
+    requestAnimationFrame(() => {
+      resellInputRef.current?.focus();
+      resellInputRef.current?.select();
+    });
+  }
+
+  async function listPass() {
+    if (!ticket) return;
     if (!ticket.chainId) {
       toast.error("Ticket is not confirmed on-chain.");
       return;
     }
-    const cents = Math.round(Number(price) * 100);
-    if (cents < bounds.min || cents > bounds.max) {
+    if (!isResellValid) {
       toast.error(
         `Price must be within 90%~110% bound: ${formatAmount(bounds.min, symbol)} – ${formatAmount(bounds.max, symbol)}`,
       );
       return;
     }
-    const labels = ["Check ticket price", "Confirm listing in your wallet", "Save your listing"];
     setBusy(true);
     try {
       await chain.run({
         title: "List ticket on secondary market",
-        labels,
+        labels: ["Check ticket price", "Confirm listing in your wallet", "Save your listing"],
         task: async (advance) => {
-          const quote = await quoteList({ data: { ticketId: ticket.id, priceCents: cents } });
+          const quote = await quoteList({ data: { ticketId: ticket.id, priceCents: parsedCents } });
           if (!quote.marketplace) throw new Error("No marketplace contract.");
           advance(1);
           updateActiveChainRun({
-            resumePayload: { action: "sellTicket", data: { ticketId: ticket.id, priceCents: cents } },
+            resumePayload: {
+              action: "sellTicket",
+              data: { ticketId: ticket.id, priceCents: parsedCents },
+            },
           });
           const hash = await sendUserCall({
             to: quote.marketplace as `0x${string}`,
@@ -348,12 +983,14 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
             args: [BigInt(quote.chainId), BigInt(quote.priceWei)],
           });
           advance(2);
-          await sellTicket({ data: { ticketId: ticket.id, priceCents: cents, txHash: hash } });
-          onChange();
-          setShowResaleDrawer(false);
+          await sellTicket({
+            data: { ticketId: ticket.id, priceCents: parsedCents, txHash: hash },
+          });
+          setIsResellOpen(false);
+          onChanged();
           return "Your ticket is now listed for resale.";
         },
-        retry: () => void list(),
+        retry: () => void listPass(),
       });
     } catch (e) {
       toast.error(friendlyChainError(e));
@@ -362,14 +999,13 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
     }
   }
 
-  async function delist() {
-    if (!ticket.chainId || !market) return;
+  async function delistPass() {
+    if (!ticket || !ticket.chainId || !market) return;
     setBusy(true);
-    const labels = ["Confirm cancellation in your wallet", "Save the update"];
     try {
       await chain.run({
         title: "Remove your ticket listing",
-        labels,
+        labels: ["Confirm cancellation in your wallet", "Save the update"],
         task: async (advance) => {
           advance(0);
           updateActiveChainRun({
@@ -383,10 +1019,10 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
           });
           advance(1);
           await cancelListing({ data: { ticketId: ticket.id, txHash: hash } });
-          onChange();
+          onChanged();
           return "Your ticket is back in your wallet as an active pass.";
         },
-        retry: () => void delist(),
+        retry: () => void delistPass(),
       });
     } catch (e) {
       toast.error(friendlyChainError(e));
@@ -395,13 +1031,12 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
     }
   }
 
-  async function vote() {
-    if (!ticket.chainId || !market) {
+  async function voteProposal() {
+    if (!ticket || !ticket.chainId || !market) {
       toast.error("This ticket has no marketplace vote.");
       return;
     }
     setBusy(true);
-    const opposing = ticket.engineVersion >= 4;
     const labels = [
       opposing
         ? "Confirm your objection in your wallet"
@@ -425,12 +1060,12 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
           });
           advance(1);
           await confirmVote({ data: { ticketId: ticket.id, txHash: hash } });
-          onChange();
+          onChanged();
           return opposing
             ? "Your objection was recorded for this ticket."
             : "Your support vote was recorded.";
         },
-        retry: () => void vote(),
+        retry: () => void voteProposal(),
       });
     } catch (e) {
       toast.error(friendlyChainError(e));
@@ -439,296 +1074,340 @@ function TicketPassCard({ ticket, onChange }: { ticket: MyTicket; onChange: () =
     }
   }
 
-  const canVote =
-    ticket.proposal?.status === "pending_vote" &&
-    !ticket.proposal.hasVoted &&
-    (ticket.status === "owned" || ticket.status === "listed" || ticket.status === "used");
-
-  const isListed = ticket.status === "listed";
-  const isUsed = ticket.status === "used";
-
-  return (
-    <div className="ticket-pass overflow-hidden rounded-2xl border border-border bg-bg-elevated/90 backdrop-blur-xl shadow-lg transition-all md:grid md:grid-cols-[280px_1fr]">
-      {/* LEFT COLUMN: DYNAMIC GATE ACCESS HUB */}
-      <div className="relative flex flex-col justify-between border-b md:border-b-0 md:border-r border-border bg-gradient-to-b from-mist/40 to-bg-elevated p-6 text-center">
-        <div>
-          {/* NFT ARTWORK CARD */}
-          <div className="relative h-44 w-full overflow-hidden rounded-xl border border-border bg-bg shadow-2xs mb-4">
-            {art ? (
-              <img src={art} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="grid h-full place-items-center text-xs font-mono text-muted">
-                <Ticket className="size-8 opacity-40 mb-1" />
-                <span>Vaulted Pass Art</span>
-              </div>
-            )}
-            <div className="absolute right-2 top-2 rounded bg-ink/80 px-2 py-0.5 font-mono text-[10px] text-paper">
-              NFT #{ticket.chainId ?? "—"}
-            </div>
-          </div>
-
-          {/* DYNAMIC QR CODE CONTAINER */}
-          {img && !isListed ? (
-            <div className="relative mx-auto size-48 rounded-xl border-2 border-primary/40 bg-paper p-3 shadow-md">
-              <div className="scan-laser-line" />
-              <img src={img} alt="Dynamic gate QR" className="size-full object-contain" />
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-mono font-bold text-primary-fg shadow-xs">
-                ROTATING CODE
-              </div>
-            </div>
-          ) : isListed ? (
-            <div className="rounded-xl border border-dashed border-sage/60 bg-sage/5 p-5 text-center">
-              <Tag className="size-8 text-sage mx-auto mb-2" />
-              <p className="font-semibold text-xs text-fg">Listed for Resale</p>
-              <p className="text-[11px] text-muted mt-1">
-                Entry barcode is locked while this pass is listed in the secondary pool.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-bg/60 p-5 text-center">
-              <Lock className="size-8 text-muted mx-auto mb-2" />
-              <p className="text-xs font-semibold text-fg">Gate Pass Locked</p>
-              <p className="text-[11px] text-muted mt-1">
-                {qr?.reason ??
-                  "Unlocks automatically 2 hours before showtime to prevent scalper screenshots."}
-              </p>
-              {unlockLabel ? (
-                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-mist/60 px-3 py-1 font-mono text-[11px] text-primary">
-                  <Clock className="size-3" />
-                  <span>{unlockLabel}</span>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        {/* SECURITY REMINDER */}
-        <div className="mt-4 pt-3 border-t border-border/40 font-mono text-[10px] text-muted">
-          <span>HMAC-SHA256 Encrypted Verification</span>
+  let leftGateContent: React.ReactNode;
+  if (ticket.status === "listed") {
+    leftGateContent = (
+      <div className="dmodal-gate-box resale-box">
+        <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+          <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+        </svg>
+        <div className="text-[0.84rem] font-semibold text-[#fde68a]">Listed for Resale</div>
+        <div className="text-[0.72rem] leading-[1.45] text-white/56">
+          Entry barcode is locked while this pass is listed in the secondary pool.
         </div>
       </div>
+    );
+  } else if (ticket.status === "owned" && ticket.phase === "active" && qrImg) {
+    leftGateContent = (
+      <div className="dmodal-gate-box ready-box">
+        <div className="dmodal-qr-frame">
+          <div className="scan-laser-line" />
+          <img src={qrImg} alt="Dynamic gate QR" />
+        </div>
+        <div className="text-[0.84rem] font-semibold text-[#86efac]">Dynamic QR Active</div>
+        <div className="text-[0.7rem] text-white/55">Refreshes every 15s</div>
+      </div>
+    );
+  } else if (ticket.status === "owned" && ticket.phase === "active") {
+    leftGateContent = (
+      <div className="dmodal-gate-box">
+        <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <div className="text-[0.84rem] font-semibold text-white">Gate Pass Locked</div>
+        <div className="text-[0.72rem] text-white/52">
+          {qr?.reason ?? "QR unlocks 2 hours before doors."}
+        </div>
+        {unlockLabel ? <span className="unlock-countdown-pill">🕒 {unlockLabel}</span> : null}
+      </div>
+    );
+  } else {
+    leftGateContent = (
+      <div className="dmodal-gate-box">
+        <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <div className="text-[0.84rem] font-semibold text-white">Gate Pass Locked</div>
+        <div className="text-[0.72rem] text-white/52">
+          {ticket.status === "used"
+            ? "Checked in at the venue."
+            : ticket.status === "refunded"
+              ? "Ticket refunded."
+              : ticket.phase === "cancelled"
+                ? "Event has been cancelled."
+                : "Event has ended."}
+        </div>
+      </div>
+    );
+  }
 
-      {/* RIGHT COLUMN: PASS METADATA & OPERATIONS */}
-      <div className="p-6 md:p-8 flex flex-col justify-between">
-        <div>
-          {/* HEADER BADGES */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <PhaseBadge phase={ticket.phase} />
-              <Badge
-                tone={
-                  ticket.status === "used"
-                    ? "ink"
-                    : ticket.status === "listed"
-                      ? "sage"
-                      : ticket.status === "refunded"
-                        ? "danger"
-                        : "sage"
-                }
-                className="font-mono text-xs uppercase"
-              >
-                {ticket.status}
-              </Badge>
-              <Badge>{ticket.tierName}</Badge>
-            </div>
+  return (
+    <div
+      className={`pass-detail-backdrop${open ? " open" : ""}`}
+      id="passDetailBackdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="pass-detail-modal"
+        id="passDetailModal"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+      >
+        <button
+          className="modal-close-btn"
+          type="button"
+          onClick={onClose}
+          title="Close"
+        >
+          ✕
+        </button>
 
-            <div className="font-mono text-xs text-muted">
-              Face: <strong className="text-fg">{formatAmount(ticket.faceCents, symbol)}</strong>
-            </div>
-          </div>
-
-          {/* EVENT TITLE & LOGISTICS */}
-          <h2 className="mt-3 font-display text-2xl sm:text-3xl font-bold tracking-tight text-fg">
-            {ticket.eventName}
-          </h2>
-
-          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-mono text-muted">
-            <div className="flex items-center gap-1.5 text-primary">
-              <Calendar className="size-3.5" />
-              <span>{new Date(ticket.startsAt).toLocaleString()}</span>
-            </div>
-            <span>•</span>
-            <div className="flex items-center gap-1.5">
-              <MapPin className="size-3.5" />
-              <span>{ticket.venue}</span>
-            </div>
-          </div>
-
-          {/* TOKEN & CONTRACT REFERENCE */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-mono text-muted">
-            {ticket.collectionAddress && ticket.chainId ? (
-              <a
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-                href={explorerToken(ticket.collectionAddress, ticket.chainId, explorer)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span>Token #{ticket.chainId}</span>
-                <ExternalLink className="size-3" />
-              </a>
+        <div className="dmodal-left">
+          <div className="dmodal-art" data-theme={themeForTicket(ticket.eventId)}>
+            {art ? (
+              <>
+                <img
+                  src={art}
+                  alt={ticket.eventName}
+                  className="dmodal-art-poster"
+                  draggable={false}
+                  onError={(e) => {
+                    const imgEl = e.currentTarget;
+                    const match = art.match(/\/ipfs\/([^?#]+)/i);
+                    const fallback = match?.[1]
+                      ? `https://gateway.pinata.cloud/ipfs/${match[1]}`
+                      : "";
+                    if (
+                      fallback &&
+                      imgEl.getAttribute("src") !== fallback &&
+                      imgEl.dataset.retried !== "1"
+                    ) {
+                      imgEl.dataset.retried = "1";
+                      imgEl.src = fallback;
+                      return;
+                    }
+                    imgEl.style.display = "none";
+                  }}
+                />
+                <div className="dmodal-art-scrim" />
+              </>
             ) : null}
-            {ticket.tokenUri ? (
-              <a
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-                href={gatewayUrl(ticket.tokenUri, config?.ipfsGateway)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span>Decentralized Metadata</span>
-                <ExternalLink className="size-3" />
-              </a>
-            ) : null}
+            <div className="folder-halftone" />
+            <span className="nft-corner-tag">NFT #{ticket.chainId ?? ticket.serial}</span>
+            <span className="art-caption">{ticketArtCaption(ticket)}</span>
           </div>
 
-          {/* GOVERNANCE PROPOSAL NOTICE */}
-          {ticket.proposal ? (
-            <div className="mt-5 rounded-xl border border-sage/40 bg-sage/5 p-4 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold text-fg">
-                  <Vote className="size-4 text-sage" />
-                  <span>
-                    Organizer Payout Proposal ({ticket.proposal.status.replace("_", " ")})
-                  </span>
-                </div>
-                {ticket.proposal.hasVoted ? (
-                  <span className="rounded bg-success/20 px-2 py-0.5 font-mono text-[10px] font-bold text-success">
-                    VOTED
-                  </span>
-                ) : null}
+          {leftGateContent}
+
+          <div className="hmac-footer">HMAC-SHA256 Encrypted Verification</div>
+        </div>
+
+        <div className="dmodal-right">
+          <div>
+            <div className="dmodal-top-row">
+              <div className="tag-row">
+                <span className={`d-badge ${badgeClass}`}>{statusLabel}</span>
+                <span className="d-badge owned">{ticket.status.toUpperCase()}</span>
+                <span className="d-badge tier">{ticket.tierName}</span>
               </div>
-              <p className="mt-1 text-muted text-[11px]">
-                {ticket.engineVersion >= 4 ? "Objections recorded:" : "Support votes:"}{" "}
-                <strong className="font-mono text-fg">
+              <div className="face-price-text">
+                Face: <strong>{formatAmount(ticket.faceCents, symbol)}</strong>
+              </div>
+            </div>
+
+            <h2 className="dmodal-title">{ticket.eventName}</h2>
+
+            <div className="dmodal-meta-line">
+              <span>📅 {new Date(ticket.startsAt).toLocaleString()}</span>
+              <span>·</span>
+              <span>📍 {ticket.venue || "TBA"}</span>
+            </div>
+
+            <div className="dmodal-links-line">
+              {ticket.collectionAddress && ticket.chainId ? (
+                <a
+                  href={explorerToken(ticket.collectionAddress, ticket.chainId, explorer)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chain-ext-link"
+                >
+                  Token #{ticket.chainId} ↗
+                </a>
+              ) : null}
+              {ticket.tokenUri ? (
+                <a
+                  href={gatewayUrl(ticket.tokenUri, ipfsGateway)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chain-ext-link"
+                >
+                  Decentralized Metadata ↗
+                </a>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Right Bottom Action / Proposal Area */}
+          {ticket.proposal ? (
+            <div className="dmodal-proposal-card">
+              <div className="proposal-title-row">
+                <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <span>
+                  Organizer Payout Proposal ({ticket.proposal.status.replace("_", " ")})
+                </span>
+              </div>
+              <div className="proposal-sub-desc">
+                {opposing ? "Objections recorded:" : "Support votes:"}{" "}
+                <strong>
                   {ticket.proposal.yesWeight} / {ticket.proposal.soldWeight}
                 </strong>{" "}
                 tickets (1/3 threshold triggers governance freeze).
-              </p>
-              {canVote ? (
-                <div className="mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void vote()}
-                    className="font-bold border-sage/50 text-sage hover:bg-sage/10"
+              </div>
+              {canVote || ticket.proposal.hasVoted ? (
+                <div className="proposal-btn-wrap">
+                  <button
+                    className={`btn-modal-amber${ticket.proposal.hasVoted ? " voted" : ""}`}
+                    type="button"
+                    disabled={busy || ticket.proposal.hasVoted}
+                    onClick={() => void voteProposal()}
                   >
-                    {busy ? "Broadcasting…" : "Submit Objection Vote"}
-                  </Button>
+                    {ticket.proposal.hasVoted
+                      ? opposing
+                        ? "✓ Objection Vote Recorded"
+                        : "✓ Support Vote Recorded"
+                      : busy
+                        ? "Broadcasting…"
+                        : opposing
+                          ? "Submit Objection Vote"
+                          : "Submit Support Vote"}
+                  </button>
                 </div>
               ) : null}
             </div>
           ) : null}
-        </div>
 
-        {/* BOTTOM ACTION REGION */}
-        <div className="mt-8 pt-5 border-t border-border/60">
-          <ChainDialog {...chain} onClose={chain.close} />
-
-          {/* WHEN LISTED: CANCEL LISTING */}
           {live && ticket.status === "listed" ? (
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-sage/30 bg-sage/5 p-4">
-              <p className="text-sm font-semibold text-fg">
-                Listed at {ticket.listPriceCents ? formatAmount(ticket.listPriceCents, symbol) : ""}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="dmodal-action-box resale-highlight">
+              <span className="font-mono text-[0.88rem] text-white">
+                Listed at{" "}
+                <strong className="text-[#fde68a]">
+                  {ticket.listPriceCents != null ? formatAmount(ticket.listPriceCents, symbol) : ""}
+                </strong>
+              </span>
+              <button
+                className="btn-modal-outline"
+                type="button"
                 disabled={busy}
-                onClick={() => void delist()}
-                className="border-border hover:bg-mist shadow-xs"
+                onClick={() => void delistPass()}
               >
                 {busy ? "Processing…" : "Delist Pass"}
-              </Button>
+              </button>
             </div>
-          ) : null}
+          ) : live && ticket.status === "owned" ? (
+            isResellOpen ? (
+              <div className="resell-inline-panel" id="resellInlinePanel">
+                <div className="resell-panel-header">
+                  <span className="resell-panel-title">Secondary Listing (90%~110% Cap)</span>
+                  <button
+                    className="btn-resell-cancel"
+                    type="button"
+                    onClick={() => setIsResellOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
 
-          {/* WHEN OWNED: SECONDARY RESALE DRAWER */}
-          {live && ticket.status === "owned" && !showResaleDrawer ? (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-muted font-mono">
-                Secondary Cap: {formatAmount(bounds.min, symbol)} – {formatAmount(bounds.max, symbol)}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowResaleDrawer(true)}
-                className="gap-1.5"
-              >
-                <Tag className="size-3.5" />
-                <span>Resell Pass</span>
-              </Button>
-            </div>
-          ) : null}
+                <div className="resell-controls-row">
+                  <div className="resell-left-controls">
+                    <div
+                      className={`resell-price-box${isResellValid ? "" : " invalid"}`}
+                      id="resellPriceBox"
+                    >
+                      <input
+                        ref={resellInputRef}
+                        className="resell-price-input"
+                        id="resellPriceInput"
+                        type="number"
+                        step="0.01"
+                        min={minDx}
+                        max={maxDx}
+                        value={resellPrice}
+                        onChange={(e) => setResellPrice(e.target.value)}
+                      />
+                      <span className="resell-currency-unit">{symbol}</span>
+                    </div>
 
-          {live && ticket.status === "owned" && showResaleDrawer ? (
-            <div className="rounded-xl border border-border bg-mist/30 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-fg">
-                  Secondary Listing (90%~110% Cap)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowResaleDrawer(false)}
-                  className="text-xs text-muted hover:text-fg font-mono"
+                    <div className="resell-preset-grp">
+                      <button
+                        className={`btn-resell-preset${isMinusActive ? " active" : ""}`}
+                        id="presetMinusBtn"
+                        type="button"
+                        onClick={() => setResellPrice(minDx.toFixed(2))}
+                      >
+                        -10%
+                      </button>
+                      <button
+                        className={`btn-resell-preset${isFaceActive ? " active" : ""}`}
+                        id="presetFaceBtn"
+                        type="button"
+                        onClick={() => setResellPrice(faceDx.toFixed(2))}
+                      >
+                        Face
+                      </button>
+                      <button
+                        className={`btn-resell-preset${isPlusActive ? " active" : ""}`}
+                        id="presetPlusBtn"
+                        type="button"
+                        onClick={() => setResellPrice(maxDx.toFixed(2))}
+                      >
+                        +10%
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn-list-pass-submit"
+                    id="confirmListPassBtn"
+                    type="button"
+                    disabled={busy || !isResellValid}
+                    onClick={() => void listPass()}
+                  >
+                    {busy ? "Broadcasting…" : "List Pass"}
+                  </button>
+                </div>
+
+                <div
+                  className={`resell-cap-hint${isResellValid ? "" : " error"}`}
+                  id="resellCapHint"
                 >
-                  Cancel
+                  {isResellValid
+                    ? `Allowed price range: ${formatAmount(bounds.min, symbol)} – ${formatAmount(bounds.max, symbol)}`
+                    : `Price must be between ${formatAmount(bounds.min, symbol)} and ${formatAmount(bounds.max, symbol)}`}
+                </div>
+              </div>
+            ) : (
+              <div className="dmodal-footer-bar">
+                <span className="cap-label">
+                  Secondary Cap: {formatAmount(bounds.min, symbol)} –{" "}
+                  {formatAmount(bounds.max, symbol)}
+                </span>
+                <button className="btn-modal-outline" type="button" onClick={openResellForm}>
+                  🏷 Resell Pass
                 </button>
               </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <Input
-                    className="w-36 font-mono font-bold bg-bg-elevated"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">
-                    {symbol}
-                  </span>
-                </div>
-
-                {/* PRESET BOUND BUTTONS */}
-                <div className="flex items-center gap-1.5 text-xs font-mono">
-                  <button
-                    type="button"
-                    onClick={() => setPrice((bounds.min / 100).toFixed(2))}
-                    className="rounded border border-border bg-bg-elevated px-2 py-1 text-muted hover:text-fg"
-                  >
-                    -10%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPrice((ticket.faceCents / 100).toFixed(2))}
-                    className="rounded border border-border bg-bg-elevated px-2 py-1 text-muted hover:text-fg"
-                  >
-                    Face
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPrice((bounds.max / 100).toFixed(2))}
-                    className="rounded border border-border bg-bg-elevated px-2 py-1 text-muted hover:text-fg"
-                  >
-                    +10%
-                  </button>
-                </div>
-
-                <Button
-                  variant="default"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => void list()}
-                  className="font-bold ml-auto shadow-xs"
-                >
-                  {busy ? "Broadcasting…" : "List Pass"}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          {isUsed ? (
-            <div className="rounded-xl border border-border bg-mist/20 p-3 text-xs text-muted flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-muted" />
-              <span>This ticket has already been verified and checked in at the event venue.</span>
+            )
+          ) : !ticket.proposal ? (
+            <div className="dmodal-footer-bar">
+              <span className="cap-label">
+                {ticket.status === "used"
+                  ? "This ticket has been verified and checked in at the venue."
+                  : ticket.status === "refunded"
+                    ? "Refund settled on-chain."
+                    : ticket.phase === "cancelled"
+                      ? "Event cancelled."
+                      : "On-Chain Attendance Verified"}
+              </span>
             </div>
           ) : null}
         </div>

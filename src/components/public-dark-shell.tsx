@@ -83,9 +83,13 @@ const NAV_ITEMS = [
 export function PublicDarkShell({
   children,
   homeViewport = false,
+  navRightPrefix,
+  mobileMenuExtra,
 }: {
   children: ReactNode;
   homeViewport?: boolean;
+  navRightPrefix?: ReactNode;
+  mobileMenuExtra?: ReactNode;
 }) {
   const {
     me,
@@ -104,10 +108,36 @@ export function PublicDarkShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [fallbackRun, setFallbackRun] = useState<PersistedChainRun | null>(null);
+  const [displayCents, setDisplayCents] = useState<number>(me?.spendableCents ?? 0);
+  const prevCentsRef = useRef<number | null>(me?.spendableCents ?? null);
   const lastIdentity = useRef<string | null>(null);
 
   const symbol = paySymbol(config);
   const networkLabel = config?.chainName || "Gnosis Chiado";
+
+  useEffect(() => {
+    const next = me?.spendableCents ?? 0;
+    const prev = prevCentsRef.current;
+    prevCentsRef.current = me ? next : null;
+    if (!me || prev === null || next <= prev) {
+      setDisplayCents(next);
+      return;
+    }
+    let start: number | null = null;
+    let rafId = 0;
+    const duration = 450;
+    function step(ts: number) {
+      if (start === null) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setDisplayCents(Math.round(prev! + (next - prev!) * ease));
+      if (p < 1) {
+        rafId = requestAnimationFrame(step);
+      }
+    }
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [me?.address, me?.spendableCents]);
 
   useEffect(() => {
     function onOpen() {
@@ -191,30 +221,37 @@ export function PublicDarkShell({
         </div>
 
         <div className="nav-right">
+          {navRightPrefix}
+
           <div className="network-chip" title={`Chain ID ${config?.chainId ?? 10200}`}>
             <span className="status-dot" />
             {networkLabel}
           </div>
 
           {me ? (
-            <div className="account-chip">
-              <div className="account-chip-bal">
-                <Wallet className="size-3.5" />
-                <span>{formatAmount(me.spendableCents, symbol)}</span>
+            <div className="attendee-wallet-pill">
+              <div className="wallet-balance-grp">
+                <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+                  <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+                </svg>
+                <span>{formatAmount(displayCents, symbol)}</span>
               </div>
-              <span className="account-chip-sep">|</span>
-              <span>{shortAddr(getAddress(me.address))}</span>
+              <span className="pill-divider" />
+              <span className="wallet-addr">{shortAddr(getAddress(me.address))}</span>
               {me.role !== "attendee" ? (
                 <Link
                   to={me.role === "admin" ? "/admin" : "/organizer"}
-                  className="account-chip-role"
+                  className="role-badge-attendee"
                 >
-                  {me.role}
+                  {me.role.toUpperCase()}
                 </Link>
-              ) : null}
+              ) : (
+                <span className="role-badge-attendee">ATTENDEE</span>
+              )}
               <button
                 type="button"
-                className="account-chip-signout"
+                className="btn-sign-out"
                 onClick={() => void signOut()}
               >
                 Sign out
@@ -255,10 +292,11 @@ export function PublicDarkShell({
               </Link>
             );
           })}
+          {mobileMenuExtra}
           {me ? (
             <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 font-mono text-xs text-white/75">
               <span>
-                {shortAddr(getAddress(me.address))} · {formatAmount(me.spendableCents, symbol)}
+                {shortAddr(getAddress(me.address))} · {formatAmount(displayCents, symbol)}
               </span>
               <button
                 type="button"
