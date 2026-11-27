@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin Setup</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Admin 顶部导航栏 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .admin-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.88);
+    border: 1px solid rgba(134, 239, 172, 0.24);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr { color: rgba(255, 255, 255, 0.82); }
+
+  .role-badge-admin {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #86efac;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover { color: #fda4af; }
+
+  /* ================= 3. 双栏仪表盘主网格 ================= */
+  .setup-dashboard-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 1340px;
+    margin: 0 auto;
+    padding: 108px 36px 72px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  /* ================= 4. 左侧：Setup Status 三卡片栏 ================= */
+  .setup-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .setup-status-section {
+    border-radius: 20px;
+    padding: 22px 24px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.94) 0%, rgba(8, 12, 10, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .section-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-heading-row h1 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+  }
+
+  .status-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .status-metric-card {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .status-metric-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(110, 231, 183, 0.32);
+  }
+
+  .status-metric-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .status-pill-badge {
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.38);
+    color: #6ee7b7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .status-pill-badge.warn {
+    background: rgba(251, 191, 36, 0.16);
+    border-color: rgba(251, 191, 36, 0.42);
+    color: #fde68a;
+  }
+
+  /* ================= 5. 横向一排 3D 磨砂半透明立式小文件夹 ================= */
+  .pocket-folders-shelf {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px;
+    padding: 10px 2px 4px;
+  }
+
+  .pocket-folder-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    will-change: transform;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .pocket-folder-item:hover {
+    transform: translate3d(0, -5px, 0);
+  }
+
+  .pocket-folder-item.is-active {
+    transform: translate3d(0, -6px, 0);
+  }
+
+  .pocket-3d-box {
+    position: relative;
+    width: 100%;
+    max-width: 148px;
+    height: 118px;
+    margin-bottom: 11px;
+  }
+
+  .pocket-back {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px 16px 18px 18px;
+    background: linear-gradient(180deg, rgba(44, 52, 49, 0.92) 0%, rgba(22, 27, 25, 0.96) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.65);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .pocket-back::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: -1px;
+    width: 44%;
+    height: 12px;
+    border-radius: 9px 11px 0 0;
+    background: linear-gradient(180deg, rgba(54, 64, 60, 0.95) 0%, rgba(44, 52, 49, 0.92) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: none;
+  }
+
+  .pocket-docs-stack {
+    position: absolute;
+    left: 11%;
+    right: 11%;
+    top: 10px;
+    bottom: 22px;
+    pointer-events: none;
+  }
+
+  .mini-doc-card {
+    position: absolute;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+    padding: 6px 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+    will-change: transform;
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .mini-doc-card span {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.42);
+  }
+  .mini-doc-card span.w-short { width: 52%; }
+  .mini-doc-card span.w-mid   { width: 78%; }
+
+  .mini-doc-card.doc-left {
+    width: 58%;
+    height: 76%;
+    left: 2%;
+    top: 6px;
+    transform: rotate(-7deg);
+    background: linear-gradient(145deg, #273832 0%, #16211d 100%);
+  }
+
+  .mini-doc-card.doc-right {
+    width: 58%;
+    height: 76%;
+    right: 2%;
+    top: 5px;
+    transform: rotate(7deg);
+    background: linear-gradient(145deg, #333a38 0%, #1a201e 100%);
+  }
+
+  .mini-doc-card.doc-center {
+    width: 72%;
+    height: 84%;
+    left: 14%;
+    top: 0px;
+    z-index: 2;
+    background: linear-gradient(145deg, #6ee7b7 0%, #1f5c45 100%);
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+
+  .pocket-folder-item:hover .mini-doc-card.doc-left,
+  .pocket-folder-item.is-active .mini-doc-card.doc-left {
+    transform: translate3d(-4px, -10px, 0) rotate(-11deg);
+  }
+
+  .pocket-folder-item:hover .mini-doc-card.doc-right,
+  .pocket-folder-item.is-active .mini-doc-card.doc-right {
+    transform: translate3d(4px, -10px, 0) rotate(11deg);
+  }
+
+  .pocket-folder-item:hover .mini-doc-card.doc-center,
+  .pocket-folder-item.is-active .mini-doc-card.doc-center {
+    transform: translate3d(0, -14px, 0) scale(1.03);
+  }
+
+  .pocket-front-glass {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 68%;
+    z-index: 4;
+    border-radius: 13px 15px 18px 18px;
+    background: linear-gradient(
+      165deg,
+      rgba(72, 82, 78, 0.62) 0%,
+      rgba(34, 40, 38, 0.78) 55%,
+      rgba(22, 26, 25, 0.9) 100%
+    );
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.36);
+    box-shadow:
+      0 -4px 14px rgba(0, 0, 0, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.32),
+      inset 0 -8px 18px rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 8px 11px;
+    transition: border-color 0.25s, background 0.25s;
+  }
+
+  .pocket-watermark {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.16);
+    pointer-events: none;
+  }
+
+  .pocket-folder-item[data-folder="kyc_db"] .doc-center {
+    background: linear-gradient(145deg, #6ee7b7 0%, #0f5138 100%);
+  }
+  .pocket-folder-item[data-folder="main_db"] .doc-center {
+    background: linear-gradient(145deg, #67e8f9 0%, #114b5f 100%);
+  }
+  .pocket-folder-item[data-folder="ipfs"] .doc-center {
+    background: linear-gradient(145deg, #d8b4fe 0%, #3b1d6e 100%);
+  }
+  .pocket-folder-item[data-folder="network"] .doc-center {
+    background: linear-gradient(145deg, #fde68a 0%, #6b440e 100%);
+  }
+  .pocket-folder-item[data-folder="reset"] .doc-center {
+    background: linear-gradient(145deg, #fda4af 0%, #6e1427 100%);
+  }
+  .pocket-folder-item[data-folder="reset"] .pocket-front-glass {
+    background: linear-gradient(
+      165deg,
+      rgba(95, 42, 52, 0.62) 0%,
+      rgba(48, 22, 27, 0.8) 55%,
+      rgba(28, 14, 17, 0.92) 100%
+    );
+    border-color: rgba(244, 63, 94, 0.34);
+  }
+
+  .pocket-folder-item.is-active .pocket-back {
+    border-color: rgba(110, 231, 183, 0.55);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.8), 0 0 24px rgba(110, 231, 183, 0.22);
+  }
+  .pocket-folder-item.is-active .pocket-front-glass {
+    border-color: rgba(110, 231, 183, 0.55);
+  }
+  .pocket-folder-item[data-folder="reset"].is-active .pocket-back,
+  .pocket-folder-item[data-folder="reset"].is-active .pocket-front-glass {
+    border-color: rgba(244, 63, 94, 0.68);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.8), 0 0 24px rgba(244, 63, 94, 0.24);
+  }
+
+  .pocket-folder-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.78);
+    text-align: center;
+    line-height: 1.3;
+    transition: color 0.2s;
+  }
+
+  .pocket-folder-item:hover .pocket-folder-label,
+  .pocket-folder-item.is-active .pocket-folder-label {
+    color: #ffffff;
+  }
+
+  .pocket-folder-item[data-folder="reset"] .pocket-folder-label {
+    color: #fda4af;
+  }
+
+  /* ================= 6. 点击小文件夹弹出的居中弹窗（始终居中展开 + 固定右上角关闭按钮） ================= */
+  .folder-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: rgba(2, 4, 3, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    overflow-y: auto;
+    transition:
+      opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0.28s step-end;
+  }
+
+  .folder-modal-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s step-start;
+  }
+
+  .receipt-paper-sheet {
+    position: relative;
+    margin: auto;
+    width: 100%;
+    max-width: 720px;
+    max-height: 88dvh;
+    overflow-y: auto;
+    border-radius: 24px;
+    padding: 28px 32px 30px;
+    background: linear-gradient(160deg, rgba(16, 26, 22, 0.97) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.32);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.9),
+      0 0 48px rgba(52, 211, 153, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform-origin: center center;
+    transform: perspective(1200px) scale(0.88);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition:
+      transform 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .folder-modal-backdrop.open .receipt-paper-sheet {
+    transform: perspective(1200px) scale(1);
+    opacity: 1;
+  }
+
+  .receipt-paper-sheet.theme-cyan {
+    border-color: rgba(34, 211, 238, 0.36);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 48px rgba(34, 211, 238, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  .receipt-paper-sheet.theme-violet {
+    border-color: rgba(168, 85, 247, 0.38);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 48px rgba(168, 85, 247, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  .receipt-paper-sheet.theme-amber {
+    border-color: rgba(251, 191, 36, 0.38);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 48px rgba(251, 191, 36, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  .receipt-paper-sheet.theme-crimson {
+    border-color: rgba(244, 63, 94, 0.42);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 48px rgba(244, 63, 94, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* 绝对定位关闭按钮：无论标题或副标题多长，永远固定在弹窗右上角不换行错位 */
+  .btn-close-sheet {
+    position: absolute;
+    top: 24px;
+    right: 26px;
+    z-index: 6;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.86rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  }
+
+  .btn-close-sheet:hover {
+    background: rgba(110, 231, 183, 0.18);
+    border-color: rgba(110, 231, 183, 0.48);
+    color: #86efac;
+    transform: rotate(90deg);
+  }
+
+  .sheet-header-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding-right: 46px;
+    margin-bottom: 20px;
+  }
+
+  .sheet-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+
+  .sheet-endpoint-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.52);
+    word-break: break-all;
+  }
+
+  /* 表单控件通用样式 */
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .f-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .f-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .f-input,
+  .f-select {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.84rem;
+    outline: none;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .f-input::placeholder { color: rgba(255, 255, 255, 0.36); }
+  .f-input:focus, .f-select:focus {
+    border-color: rgba(110, 231, 183, 0.5);
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.12);
+  }
+
+  .f-select option {
+    background: #0c1410;
+    color: #ffffff;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    color: rgba(255, 255, 255, 0.84);
+    cursor: pointer;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #6ee7b7;
+    cursor: pointer;
+  }
+
+  .btn-row-wrap {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .btn-full-width {
+    width: 100%;
+  }
+
+  .reset-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .reset-inline-row .f-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .btn-solid-mint {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .btn-solid-mint:hover:not(:disabled) {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  .btn-solid-mint:disabled {
+    background: rgba(110, 231, 183, 0.22);
+    color: rgba(255, 255, 255, 0.42);
+    cursor: not-allowed;
+  }
+
+  .btn-solid-crimson {
+    height: 44px;
+    padding: 0 22px;
+    border-radius: 10px;
+    border: 1px solid rgba(244, 63, 94, 0.5);
+    background: linear-gradient(145deg, rgba(225, 29, 72, 0.88) 0%, rgba(159, 18, 57, 0.96) 100%);
+    color: #ffffff;
+    font-size: 0.84rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.2s;
+  }
+
+  .btn-solid-crimson:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
+
+  .btn-solid-crimson:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  .btn-outline-glass {
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  }
+
+  .btn-outline-glass:hover {
+    background: rgba(110, 231, 183, 0.14);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+  }
+
+  .db-tables-stats-grid {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 24px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.84rem;
+  }
+
+  .db-stat-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .db-stat-cell strong {
+    color: #86efac;
+    font-weight: 700;
+  }
+
+  .signer-sub-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.54);
+  }
+
+  /* ================= 7. 右侧独立卡片栏（Testnet Faucet + Resale Royalty） ================= */
+  .setup-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .side-widget-card {
+    border-radius: 20px;
+    padding: 24px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.22);
+    box-shadow: 0 22px 52px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .side-widget-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .faucet-status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge-dev-active {
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.4);
+    color: #6ee7b7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .faucet-addr-link {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.86rem;
+    color: #86efac;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .btn-use-native {
+    width: fit-content;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .btn-use-native:hover {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  .royalty-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .royalty-input-row .f-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ================= 8. 两步链上交易进度确认弹窗 ================= */
+  .tx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(2, 4, 3, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.26s step-end;
+  }
+
+  .tx-modal-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s step-start;
+  }
+
+  .tx-modal-card {
+    position: relative;
+    margin: auto;
+    width: 100%;
+    max-width: 460px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(160deg, rgba(22, 34, 28, 0.96) 0%, rgba(9, 13, 11, 0.99) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: perspective(1200px) scale(0.9);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition:
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open .tx-modal-card {
+    transform: perspective(1200px) scale(1);
+    opacity: 1;
+  }
+
+  .tx-modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 24px;
+    line-height: 1.2;
+  }
+
+  .tx-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .tx-step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .tx-step-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .step-indicator {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinTx 0.8s linear infinite;
+  }
+
+  @keyframes spinTx { to { transform: rotate(360deg); } }
+
+  .step-pending-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .step-done-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.45);
+  }
+
+  .tx-step-text {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .tx-step-text.muted { color: rgba(255, 255, 255, 0.45); }
+
+  .tx-step-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.48);
+    white-space: nowrap;
+  }
+
+  .tx-step-status.active { color: #86efac; }
+  .tx-step-status.done   { color: #6ee7b7; }
+
+  .btn-tx-action {
+    min-width: 124px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-tx-action.ready {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    cursor: pointer;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.3);
+  }
+
+  /* Toast 轻量提示条 */
+  .setup-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 28px;
+    z-index: 130;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: rgba(14, 24, 19, 0.96);
+    border: 1px solid rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+    pointer-events: none;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+  }
+
+  .setup-toast.show {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  @media (max-width: 1120px) {
+    .setup-dashboard-shell {
+      grid-template-columns: 1fr;
+    }
+    .setup-right-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .setup-dashboard-shell { padding: 98px 18px 56px; }
+    .pocket-folders-shelf {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px 14px;
+    }
+    .status-cards-grid,
+    .form-grid-2,
+    .db-tables-stats-grid,
+    .setup-right-col {
+      grid-template-columns: 1fr;
+    }
+    .reset-inline-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .receipt-paper-sheet {
+      padding: 24px 20px;
+    }
+    .btn-close-sheet {
+      top: 18px;
+      right: 18px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html">Dashboard</a>
+      <a href="admin_list.html">List</a>
+      <a href="admin_setup.html" class="active">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span id="navBalanceText">0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="setup-dashboard-shell">
+  <!-- 左侧主工作区 -->
+  <div class="setup-left-col" id="setupLeftCol">
+    <!-- 顶部 Setup Status 三卡片 -->
+    <section class="setup-status-section">
+      <div class="section-heading-row">
+        <h1>Setup Status</h1>
+      </div>
+
+      <div class="status-cards-grid">
+        <div class="status-metric-card">
+          <span class="status-metric-title">1. Database</span>
+          <span class="status-pill-badge" id="statusDbBadge">Connected</span>
+        </div>
+
+        <div class="status-metric-card">
+          <span class="status-metric-title">2. IPFS Storage</span>
+          <span class="status-pill-badge" id="statusIpfsBadge">Connected</span>
+        </div>
+
+        <div class="status-metric-card">
+          <span class="status-metric-title">3. Signer Key</span>
+          <span class="status-pill-badge" id="statusSignerBadge">Ready</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 横向一排 3D 磨砂半透明立式小文件夹（Reset Application Data 放在最后一个） -->
+    <section class="pocket-folders-shelf" id="pocketFoldersShelf">
+      <!-- 1. KYC Isolated Database -->
+      <div class="pocket-folder-item" data-folder="kyc_db" id="folder-kyc_db">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">KYC</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">KYC Isolated Database</span>
+      </div>
+
+      <!-- 2. Database -->
+      <div class="pocket-folder-item" data-folder="main_db" id="folder-main_db">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">DB</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Database</span>
+      </div>
+
+      <!-- 3. IPFS & Pinata -->
+      <div class="pocket-folder-item" data-folder="ipfs" id="folder-ipfs">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">IPFS</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">IPFS &amp; Pinata</span>
+      </div>
+
+      <!-- 4. Network & Signer -->
+      <div class="pocket-folder-item" data-folder="network" id="folder-network">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">RPC</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Network &amp; Signer</span>
+      </div>
+
+      <!-- 5. Reset Application Data（放在最后一个） -->
+      <div class="pocket-folder-item" data-folder="reset" id="folder-reset">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">RST</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Reset Application Data</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- 右侧独立卡片栏（Testnet Faucet + Resale Royalty） -->
+  <aside class="setup-right-col">
+    <section class="side-widget-card">
+      <h2 class="side-widget-title">Testnet Faucet</h2>
+      <div class="faucet-status-row">
+        <span class="badge-dev-active" id="faucetModeBadge">Dev Active</span>
+        <a class="faucet-addr-link" id="faucetAddrLink" title="Copy Faucet Address">0xd4fd...369d</a>
+      </div>
+      <button class="btn-use-native" id="useNativeXdaiBtn" type="button">Use native xDAI</button>
+    </section>
+
+    <section class="side-widget-card">
+      <h2 class="side-widget-title">Resale Royalty (%)</h2>
+      <div class="royalty-input-row">
+        <input class="f-input" id="royaltyPercentInput" type="number" min="0" max="50" step="0.5" value="10">
+        <button class="btn-solid-mint" id="updateRoyaltyBtn" type="button">Update</button>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<!-- 点击小文件夹后始终居中展开的弹窗 -->
+<div class="folder-modal-backdrop" id="folderModalBackdrop">
+  <div class="receipt-paper-sheet" id="receiptPaperSheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- 两步链上交易进度确认弹窗（Use native xDAI & Update Royalty 触发） -->
+<div class="tx-modal-backdrop" id="txProgressModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="txModalTitle">
+    <h3 class="tx-modal-title" id="txModalTitle">Update resale royalty</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="step1Text">Confirm transaction in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="step1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="step2Text">Record configuration on-chain</span>
+        </div>
+        <span class="tx-step-status" id="step2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="txModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<div class="setup-toast" id="setupToast"></div>
+
+<script>
+  /* ================= 1. 通用 Toast 提示 & Sign out ================= */
+  const setupToast = document.getElementById("setupToast");
+  let toastTimer = null;
+
+  function showToast(msg) {
+    setupToast.textContent = msg;
+    setupToast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      setupToast.classList.remove("show");
+    }, 2400);
+  }
+
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 两步交易进度确认弹窗控制器 ================= */
+  const txProgressModal = document.getElementById("txProgressModal");
+  const txModalTitle = document.getElementById("txModalTitle");
+  const step1Icon = document.getElementById("step1Icon");
+  const step1Text = document.getElementById("step1Text");
+  const step1Status = document.getElementById("step1Status");
+  const step2Icon = document.getElementById("step2Icon");
+  const step2Text = document.getElementById("step2Text");
+  const step2Status = document.getElementById("step2Status");
+  const txModalActionBtn = document.getElementById("txModalActionBtn");
+
+  let txTimers = [];
+
+  function clearTxTimers() {
+    txTimers.forEach(t => clearTimeout(t));
+    txTimers = [];
+  }
+
+  function runTwoStepTxModal({ title, step1Label, step2Label, step2DoneLabel = "Recorded", onComplete }) {
+    clearTxTimers();
+
+    txModalTitle.textContent = title;
+    step1Text.textContent = step1Label;
+    step2Text.textContent = step2Label;
+
+    step1Icon.innerHTML = `<span class="step-spinner"></span>`;
+    step1Text.classList.remove("muted");
+    step1Status.textContent = "In progress";
+    step1Status.className = "tx-step-status active";
+
+    step2Icon.innerHTML = `<span class="step-pending-dot"></span>`;
+    step2Text.classList.add("muted");
+    step2Status.textContent = "Pending";
+    step2Status.className = "tx-step-status";
+
+    txModalActionBtn.disabled = true;
+    txModalActionBtn.classList.remove("ready");
+    txModalActionBtn.textContent = "Please wait";
+
+    txProgressModal.classList.add("open");
+
+    txTimers.push(setTimeout(() => {
+      step1Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step1Status.textContent = "Confirmed";
+      step1Status.className = "tx-step-status done";
+
+      step2Icon.innerHTML = `<span class="step-spinner"></span>`;
+      step2Text.classList.remove("muted");
+      step2Status.textContent = "In progress";
+      step2Status.className = "tx-step-status active";
+    }, 1100));
+
+    txTimers.push(setTimeout(() => {
+      step2Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step2Status.textContent = step2DoneLabel;
+      step2Status.className = "tx-step-status done";
+
+      txModalActionBtn.disabled = false;
+      txModalActionBtn.classList.add("ready");
+      txModalActionBtn.textContent = "Done";
+
+      if (typeof onComplete === "function") onComplete();
+    }, 2200));
+  }
+
+  function closeTxProgressModal() {
+    clearTxTimers();
+    txProgressModal.classList.remove("open");
+  }
+
+  txModalActionBtn.addEventListener("click", () => {
+    if (!txModalActionBtn.disabled) closeTxProgressModal();
+  });
+
+  /* ================= 3. 持久化配置状态 ================= */
+  const setupState = {
+    kycDbUrl: "",
+    kycAutoApprove: false,
+    kycHostLabel: "database · ep-curly-dew-b3mfo4ou-pooler.c-4.ap-southeast-1.aws.neon.tech",
+
+    mainDbUrl: "",
+    dbStats: {
+      events: 5,
+      ticket_tiers: 5,
+      tickets: 98,
+      listings: 99,
+      ledger: 13,
+      organizers: 1,
+      kyc: 0,
+      kyc_public: 1,
+      kyc_audit: 51,
+      deployed_contracts: 17,
+      admins: 1,
+      withdraw_requests: 2
+    },
+
+    pinataJwt: "",
+    pinataGateway: "https://dweb.link",
+
+    networkPreset: "Gnosis Mainnet · 100",
+    chainName: "Gnosis",
+    nativeSymbol: "xDAI",
+    chainId: "100",
+    rpcUrl: "https://rpc.gnosischain.com",
+    explorer: "https://gnosisscan.io",
+    adminWallet: "0xE52A3EBcE46135CC10922Ee21494BBb12C82A921",
+    operatorKey: "",
+    signerSummary: "Signer 0xE52A...A921 · 0.0190 xDAI",
+
+    faucetNative: false,
+    royaltyPercent: "10"
+  };
+
+  /* ================= 4. 点击小文件夹始终居中展开的弹窗渲染 ================= */
+  const folderModalBackdrop = document.getElementById("folderModalBackdrop");
+  const receiptPaperSheet = document.getElementById("receiptPaperSheet");
+  const allFolders = Array.from(document.querySelectorAll(".pocket-folder-item"));
+  let activeFolderKey = null;
+
+  function renderFolderSheet(key) {
+    if (key === "kyc_db") {
+      receiptPaperSheet.className = "receipt-paper-sheet";
+      receiptPaperSheet.innerHTML = `
+        <button class="btn-close-sheet" type="button" onclick="closeSetupFolder()" title="Close">✕</button>
+
+        <div class="sheet-header-row">
+          <h2 class="sheet-title">KYC Isolated Database</h2>
+          <span class="sheet-endpoint-meta">${setupState.kycHostLabel}</span>
+        </div>
+
+        <div class="form-stack">
+          <div class="f-group">
+            <label class="f-label" for="kycDbUrlInput">DATABASE_URL_KYC</label>
+            <input class="f-input" id="kycDbUrlInput" type="password" value="${setupState.kycDbUrl}" placeholder="postgres://••••">
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="kycAutoApproveChk" ${setupState.kycAutoApprove ? "checked" : ""}>
+            <span>Auto-approve submissions (otherwise they stay pending).</span>
+          </label>
+
+          <div class="btn-row-wrap">
+            <button class="btn-solid-mint" type="button" onclick="saveKycDbSettings()">Save KYC settings</button>
+            <button class="btn-outline-glass" type="button" onclick="clearKycDbUrl()">Clear saved URL</button>
+          </div>
+        </div>
+      `;
+    } else if (key === "main_db") {
+      receiptPaperSheet.className = "receipt-paper-sheet theme-cyan";
+      const s = setupState.dbStats;
+      receiptPaperSheet.innerHTML = `
+        <button class="btn-close-sheet" type="button" onclick="closeSetupFolder()" title="Close">✕</button>
+
+        <div class="sheet-header-row">
+          <h2 class="sheet-title">Database</h2>
+        </div>
+
+        <div class="form-stack">
+          <div class="f-group">
+            <label class="f-label" for="mainDbUrlInput">DATABASE_URL</label>
+            <input class="f-input" id="mainDbUrlInput" type="password" value="${setupState.mainDbUrl}" placeholder="postgres://••••"
+              oninput="onMainDbInput(this.value)">
+          </div>
+
+          <div class="btn-row-wrap">
+            <button class="btn-outline-glass" type="button" onclick="testMainDbConnection()">Test</button>
+            <button class="btn-solid-mint" id="saveMainDbBtn" type="button" ${setupState.mainDbUrl ? "" : "disabled"} onclick="saveMainDbUrl()">Save</button>
+          </div>
+
+          <div class="db-tables-stats-grid">
+            <div class="db-stat-cell"><span>events</span><strong>${s.events}</strong></div>
+            <div class="db-stat-cell"><span>ticket_tiers</span><strong>${s.ticket_tiers}</strong></div>
+            <div class="db-stat-cell"><span>tickets</span><strong>${s.tickets}</strong></div>
+
+            <div class="db-stat-cell"><span>listings</span><strong>${s.listings}</strong></div>
+            <div class="db-stat-cell"><span>ledger</span><strong>${s.ledger}</strong></div>
+            <div class="db-stat-cell"><span>organizers</span><strong>${s.organizers}</strong></div>
+
+            <div class="db-stat-cell"><span>kyc</span><strong>${s.kyc}</strong></div>
+            <div class="db-stat-cell"><span>kyc_public</span><strong>${s.kyc_public}</strong></div>
+            <div class="db-stat-cell"><span>kyc_audit</span><strong>${s.kyc_audit}</strong></div>
+
+            <div class="db-stat-cell"><span>deployed_contracts</span><strong>${s.deployed_contracts}</strong></div>
+            <div class="db-stat-cell"><span>admins</span><strong>${s.admins}</strong></div>
+            <div class="db-stat-cell"><span>withdraw_requests</span><strong>${s.withdraw_requests}</strong></div>
+          </div>
+        </div>
+      `;
+    } else if (key === "ipfs") {
+      receiptPaperSheet.className = "receipt-paper-sheet theme-violet";
+      receiptPaperSheet.innerHTML = `
+        <button class="btn-close-sheet" type="button" onclick="closeSetupFolder()" title="Close">✕</button>
+
+        <div class="sheet-header-row">
+          <h2 class="sheet-title">IPFS &amp; Pinata</h2>
+        </div>
+
+        <div class="form-stack">
+          <div class="f-group">
+            <label class="f-label" for="pinataJwtInput">Pinata JWT</label>
+            <input class="f-input" id="pinataJwtInput" type="password" value="${setupState.pinataJwt}" placeholder="eyJ••••"
+              oninput="onPinataJwtInput(this.value)">
+          </div>
+
+          <button class="btn-solid-mint btn-full-width" id="savePinataBtn" type="button"
+            ${setupState.pinataJwt ? "" : "disabled"}
+            onclick="savePinataJwt()">
+            Save Pinata
+          </button>
+
+          <div class="f-group" style="margin-top: 4px;">
+            <label class="f-label" for="pinataGatewayInput">IPFS read gateway</label>
+            <input class="f-input" id="pinataGatewayInput" type="text" value="${setupState.pinataGateway}">
+          </div>
+
+          <button class="btn-outline-glass btn-full-width" type="button" onclick="saveIpfsGateway()">
+            Save gateway
+          </button>
+        </div>
+      `;
+    } else if (key === "network") {
+      receiptPaperSheet.className = "receipt-paper-sheet theme-amber";
+      receiptPaperSheet.innerHTML = `
+        <button class="btn-close-sheet" type="button" onclick="closeSetupFolder()" title="Close">✕</button>
+
+        <div class="sheet-header-row">
+          <h2 class="sheet-title">Network &amp; Signer</h2>
+          <span class="sheet-endpoint-meta">${setupState.chainName} (ID ${setupState.chainId})</span>
+        </div>
+
+        <div class="form-stack">
+          <div class="f-group">
+            <label class="f-label" for="networkPresetSelect">Network preset</label>
+            <select class="f-select" id="networkPresetSelect" onchange="onNetworkPresetChange(this.value)">
+              <option value="Gnosis Mainnet · 100" ${setupState.networkPreset === "Gnosis Mainnet · 100" ? "selected" : ""}>Gnosis Mainnet · 100</option>
+              <option value="Gnosis Chiado Testnet · 10200" ${setupState.networkPreset === "Gnosis Chiado Testnet · 10200" ? "selected" : ""}>Gnosis Chiado Testnet · 10200</option>
+            </select>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="f-group">
+              <label class="f-label" for="chainNameInput">Chain name</label>
+              <input class="f-input" id="chainNameInput" type="text" value="${setupState.chainName}">
+            </div>
+
+            <div class="f-group">
+              <label class="f-label" for="nativeSymbolInput">Native symbol</label>
+              <input class="f-input" id="nativeSymbolInput" type="text" value="${setupState.nativeSymbol}">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="f-group">
+              <label class="f-label" for="chainIdInput">Chain ID</label>
+              <input class="f-input" id="chainIdInput" type="text" value="${setupState.chainId}">
+            </div>
+
+            <div class="f-group">
+              <label class="f-label" for="rpcUrlInput">RPC URL</label>
+              <input class="f-input" id="rpcUrlInput" type="text" value="${setupState.rpcUrl}">
+            </div>
+          </div>
+
+          <div class="f-group">
+            <label class="f-label" for="explorerInput">Explorer</label>
+            <input class="f-input" id="explorerInput" type="text" value="${setupState.explorer}">
+          </div>
+
+          <div class="f-group">
+            <label class="f-label" for="adminWalletInput">Platform admin wallet</label>
+            <input class="f-input" id="adminWalletInput" type="text" value="${setupState.adminWallet}">
+          </div>
+
+          <div class="f-group">
+            <label class="f-label" for="operatorKeyInput">Operator private key</label>
+            <input class="f-input" id="operatorKeyInput" type="password" value="${setupState.operatorKey}" placeholder="0x••••">
+          </div>
+
+          <div class="signer-sub-meta" id="signerSummaryMeta">${setupState.signerSummary}</div>
+
+          <div class="btn-row-wrap">
+            <button class="btn-outline-glass" type="button" onclick="pingRpcEndpoint()">Ping RPC</button>
+            <button class="btn-solid-mint" type="button" onclick="saveNetworkSettings()">Save network</button>
+          </div>
+        </div>
+      `;
+    } else if (key === "reset") {
+      receiptPaperSheet.className = "receipt-paper-sheet theme-crimson";
+      receiptPaperSheet.innerHTML = `
+        <button class="btn-close-sheet" type="button" onclick="closeSetupFolder()" title="Close">✕</button>
+
+        <div class="sheet-header-row">
+          <h2 class="sheet-title" style="color:#fda4af;">Reset Application Data</h2>
+        </div>
+
+        <div class="form-stack">
+          <p style="font-size:0.84rem;line-height:1.6;color:rgba(255,255,255,0.68);">
+            Permanently deletes app records, listings, and KYC data. On-chain contracts and balances remain untouched.
+          </p>
+
+          <div class="f-group">
+            <label class="f-label" for="resetConfirmInput">Type RESET APPLICATION DATA to confirm</label>
+            <div class="reset-inline-row">
+              <input class="f-input" id="resetConfirmInput" type="text" placeholder="RESET APPLICATION DATA"
+                oninput="document.getElementById('execResetBtn').disabled = (this.value.trim() !== 'RESET APPLICATION DATA')">
+              <button class="btn-solid-crimson" id="execResetBtn" type="button" disabled onclick="executeResetData()">
+                Clear app data
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  function openSetupFolder(key) {
+    activeFolderKey = key;
+    allFolders.forEach(f => {
+      f.classList.toggle("is-active", f.dataset.folder === key);
+    });
+
+    renderFolderSheet(key);
+    receiptPaperSheet.scrollTop = 0;
+
+    requestAnimationFrame(() => {
+      folderModalBackdrop.classList.add("open");
+    });
+  }
+
+  window.closeSetupFolder = function() {
+    if (!folderModalBackdrop.classList.contains("open")) return;
+    folderModalBackdrop.classList.remove("open");
+    activeFolderKey = null;
+    allFolders.forEach(f => f.classList.remove("is-active"));
+  };
+
+  allFolders.forEach(folder => {
+    folder.addEventListener("click", () => {
+      openSetupFolder(folder.dataset.folder);
+    });
+  });
+
+  folderModalBackdrop.addEventListener("click", (e) => {
+    if (e.target === folderModalBackdrop) closeSetupFolder();
+  });
+
+  /* ================= 5. 表单操作回调 ================= */
+  window.saveKycDbSettings = function() {
+    setupState.kycDbUrl = document.getElementById("kycDbUrlInput").value;
+    setupState.kycAutoApprove = document.getElementById("kycAutoApproveChk").checked;
+    showToast("KYC database settings saved ✓");
+  };
+
+  window.clearKycDbUrl = function() {
+    setupState.kycDbUrl = "";
+    const inp = document.getElementById("kycDbUrlInput");
+    if (inp) inp.value = "";
+    showToast("Saved KYC URL cleared");
+  };
+
+  window.onMainDbInput = function(val) {
+    setupState.mainDbUrl = val;
+    const btn = document.getElementById("saveMainDbBtn");
+    if (btn) btn.disabled = !val.trim();
+  };
+
+  window.testMainDbConnection = function() {
+    showToast("PostgreSQL connection healthy (18ms) ✓");
+  };
+
+  window.saveMainDbUrl = function() {
+    document.getElementById("statusDbBadge").textContent = "Connected";
+    showToast("Database URL saved ✓");
+  };
+
+  window.onPinataJwtInput = function(val) {
+    setupState.pinataJwt = val;
+    const btn = document.getElementById("savePinataBtn");
+    if (btn) btn.disabled = !val.trim();
+  };
+
+  window.savePinataJwt = function() {
+    setupState.pinataJwt = document.getElementById("pinataJwtInput").value;
+    document.getElementById("statusIpfsBadge").textContent = "Connected";
+    showToast("Pinata JWT saved ✓");
+  };
+
+  window.saveIpfsGateway = function() {
+    const gw = document.getElementById("pinataGatewayInput").value.trim();
+    if (!gw) {
+      showToast("Please enter an IPFS read gateway URL");
+      return;
+    }
+    setupState.pinataGateway = gw;
+    showToast("IPFS read gateway saved ✓");
+  };
+
+  window.onNetworkPresetChange = function(preset) {
+    setupState.networkPreset = preset;
+    if (preset.includes("10200")) {
+      setupState.chainName = "Gnosis Chiado";
+      setupState.chainId = "10200";
+      setupState.rpcUrl = "https://rpc.chiadochain.net";
+      setupState.explorer = "https://gnosis-chiado.blockscout.com";
+    } else {
+      setupState.chainName = "Gnosis";
+      setupState.chainId = "100";
+      setupState.rpcUrl = "https://rpc.gnosischain.com";
+      setupState.explorer = "https://gnosisscan.io";
+    }
+    renderFolderSheet("network");
+  };
+
+  window.pingRpcEndpoint = function() {
+    const rpc = document.getElementById("rpcUrlInput")?.value || setupState.rpcUrl;
+    showToast(`RPC OK (${rpc}) · 42ms ✓`);
+  };
+
+  window.saveNetworkSettings = function() {
+    setupState.chainName = document.getElementById("chainNameInput").value;
+    setupState.nativeSymbol = document.getElementById("nativeSymbolInput").value;
+    setupState.chainId = document.getElementById("chainIdInput").value;
+    setupState.rpcUrl = document.getElementById("rpcUrlInput").value;
+    setupState.explorer = document.getElementById("explorerInput").value;
+    setupState.adminWallet = document.getElementById("adminWalletInput").value;
+    setupState.operatorKey = document.getElementById("operatorKeyInput").value;
+    document.getElementById("statusSignerBadge").textContent = "Ready";
+    showToast("Network & Signer configuration saved ✓");
+  };
+
+  window.executeResetData = function() {
+    Object.assign(setupState.dbStats, {
+      events: 0,
+      ticket_tiers: 0,
+      tickets: 0,
+      listings: 0,
+      ledger: 0,
+      kyc: 0,
+      kyc_audit: 0,
+      withdraw_requests: 0
+    });
+    showToast("App data cleared ✓");
+    renderFolderSheet("main_db");
+  };
+
+  /* ================= 6. 右侧栏交互：点击 Use native xDAI 和 Update 触发两步进度弹窗 ================= */
+  document.getElementById("faucetAddrLink").addEventListener("click", () => {
+    navigator.clipboard?.writeText("0xd4fd812a94c10e7b5290f8a1e72c9043b811369d");
+    showToast("Copied faucet address 0xd4fd...369d");
+  });
+
+  document.getElementById("useNativeXdaiBtn").addEventListener("click", (e) => {
+    const switchingToNative = !setupState.faucetNative;
+    const btn = e.currentTarget;
+
+    runTwoStepTxModal({
+      title: switchingToNative ? "Switch to native xDAI" : "Switch to Dev Faucet",
+      step1Label: "Confirm gas token mode in your wallet",
+      step2Label: "Update faucet settlement config",
+      step2DoneLabel: "Updated",
+      onComplete: () => {
+        setupState.faucetNative = switchingToNative;
+        const badge = document.getElementById("faucetModeBadge");
+        if (setupState.faucetNative) {
+          badge.textContent = "Native xDAI";
+          badge.classList.add("warn");
+          btn.textContent = "Switch to Dev Faucet";
+        } else {
+          badge.textContent = "Dev Active";
+          badge.classList.remove("warn");
+          btn.textContent = "Use native xDAI";
+        }
+      }
+    });
+  });
+
+  document.getElementById("updateRoyaltyBtn").addEventListener("click", () => {
+    const val = parseFloat(document.getElementById("royaltyPercentInput").value);
+    if (!Number.isFinite(val) || val < 0 || val > 50) {
+      showToast("Royalty must be between 0% and 50%");
+      return;
+    }
+
+    runTwoStepTxModal({
+      title: `Update resale royalty (${val}%)`,
+      step1Label: "Confirm royalty rate in your wallet",
+      step2Label: "Record new royalty cap on-chain",
+      step2DoneLabel: "Recorded",
+      onComplete: () => {
+        setupState.royaltyPercent = String(val);
+      }
+    });
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (txProgressModal.classList.contains("open")) {
+        if (!txModalActionBtn.disabled) closeTxProgressModal();
+      } else if (folderModalBackdrop.classList.contains("open")) {
+        closeSetupFolder();
+      }
+    }
+  });
+
+  /* ================= 7. 高性能暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.4,
+    alpha: 0.16 + Math.random() * 0.42,
+    vy: -(0.08 + Math.random() * 0.18),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 18;
+  const RIBBON_SEGS = 64;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = 0.85;
+
+    const hasMouse = smoothMouse.x > -500;
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (hasMouse) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 48400 && distSq > 0.01) {
+            const dist = Math.sqrt(distSq);
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = 0.024 + centerGlow * 0.075;
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+  let lastFrameTime = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    const isModalOpen =
+      folderModalBackdrop.classList.contains("open") ||
+      txProgressModal.classList.contains("open");
+    if (isModalOpen && now - lastFrameTime < 50) return;
+    lastFrameTime = now;
+
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    const hasMouse = smoothMouse.x > -500;
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (hasMouse) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 32400 && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a.toFixed(3)})`
+        : `rgba(255, 255, 255, ${(a * 0.8).toFixed(3)})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>

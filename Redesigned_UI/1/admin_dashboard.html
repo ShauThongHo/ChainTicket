@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin Dashboard</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Admin 顶部导航栏 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .admin-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(134, 239, 172, 0.24);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .admin-wallet-pill:hover {
+    border-color: rgba(134, 239, 172, 0.45);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 18px rgba(110, 231, 183, 0.14);
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr {
+    color: rgba(255, 255, 255, 0.82);
+    letter-spacing: -0.01em;
+  }
+
+  .role-badge-admin {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #86efac;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover {
+    color: #fda4af;
+  }
+
+  /* ================= 3. 双栏 Bento Dashboard 主容器 ================= */
+  .admin-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 106px 48px 80px;
+  }
+
+  .dash-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .dash-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dash-main-title {
+    font-size: clamp(1.85rem, 3vw, 2.35rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+
+  .admin-role-pill {
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.28);
+    color: #86efac;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .dash-search-box {
+    width: 310px;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 21, 18, 0.72);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .dash-search-box:focus-within {
+    border-color: rgba(110, 231, 183, 0.45);
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.12);
+  }
+
+  .dash-search-box svg {
+    width: 15px;
+    height: 15px;
+    stroke: rgba(255, 255, 255, 0.45);
+    stroke-width: 2;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  .dash-search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 0.82rem;
+  }
+
+  .dash-search-box input::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
+  .bento-grid {
+    display: grid;
+    grid-template-columns: 1fr 390px;
+    gap: 22px;
+    align-items: start;
+  }
+
+  .bento-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  .bento-right-col {
+    position: sticky;
+    top: 96px;
+  }
+
+  .glass-panel {
+    border-radius: 20px;
+    background: linear-gradient(
+      155deg,
+      rgba(16, 25, 21, 0.72) 0%,
+      rgba(8, 12, 10, 0.84) 100%
+    );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  .section-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .section-count-tag {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* ================= 4. 顶部 4 个格子 ================= */
+  .kpi-4-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .kpi-card {
+    position: relative;
+    padding: 20px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, rgba(16, 25, 21, 0.72) 0%, rgba(8, 12, 10, 0.84) 100%);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 138px;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(134, 239, 172, 0.32);
+  }
+
+  .kpi-card.accent-card {
+    background:
+      radial-gradient(circle at 85% 15%, rgba(110, 231, 183, 0.42) 0%, transparent 58%),
+      linear-gradient(145deg, #0f5138 0%, #07291c 65%, #051b13 100%);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    box-shadow:
+      0 20px 45px rgba(16, 185, 129, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  .kpi-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .kpi-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    display: grid;
+    place-items: center;
+    color: #86efac;
+  }
+
+  .kpi-card.accent-card .kpi-icon-box {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+  }
+
+  .kpi-icon-box svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+  }
+
+  .kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.56);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .kpi-card.accent-card .kpi-label {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .kpi-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.42rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  /* ================= 5. 中部：Withdraw Requests ================= */
+  .withdraw-panel {
+    padding: 22px 24px;
+  }
+
+  .withdraw-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+  }
+
+  .withdraw-item {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    transition: background 0.2s;
+  }
+
+  .withdraw-item:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .withdraw-item:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .wd-title {
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 5px;
+  }
+
+  .wd-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.52);
+  }
+
+  .wd-status-badge {
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .wd-status-badge.pending {
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+
+  .wd-status-badge.done {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    color: #6ee7b7;
+  }
+
+  /* ================= 6. 底部：Events 5个活动管理列表 + 可折叠 Information 抽屉 ================= */
+  .events-panel {
+    padding: 22px 24px;
+  }
+
+  .events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .admin-event-card {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    transition: border-color 0.22s, background 0.22s;
+  }
+
+  .admin-event-card:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(134, 239, 172, 0.28);
+  }
+
+  .admin-event-card.is-frozen {
+    border-color: rgba(244, 63, 94, 0.38);
+    background: rgba(244, 63, 94, 0.04);
+  }
+
+  .ev-card-main-row {
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .ev-badges-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .ev-badge {
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .ev-badge.active    { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(110, 231, 183, 0.42); color: #6ee7b7; }
+  .ev-badge.ended     { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.78); }
+  .ev-badge.withdrawn { background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; }
+  .ev-badge.frozen    { background: rgba(244, 63, 94, 0.22); border: 1px solid rgba(244, 63, 94, 0.48); color: #fda4af; }
+  .ev-badge.neutral   { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.65); font-family: monospace; }
+
+  .ev-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .ev-right-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ▶ / ▼ Information 可折叠触发按钮 */
+  .btn-info-toggle {
+    height: 38px;
+    padding: 0 15px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+
+  .btn-info-toggle:hover,
+  .btn-info-toggle.open {
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    background: rgba(110, 231, 183, 0.08);
+  }
+
+  .btn-freeze {
+    min-width: 88px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 9px;
+    border: 1px solid rgba(244, 63, 94, 0.48);
+    background: linear-gradient(145deg, rgba(190, 49, 49, 0.85) 0%, rgba(136, 28, 36, 0.92) 100%);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(225, 29, 72, 0.22);
+    transition: all 0.2s;
+  }
+
+  .btn-freeze:hover {
+    background: linear-gradient(145deg, rgba(225, 58, 58, 0.95) 0%, rgba(159, 32, 42, 0.98) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(225, 29, 72, 0.36);
+  }
+
+  .btn-freeze.unfreeze-mode {
+    background: rgba(110, 231, 183, 0.16);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    box-shadow: none;
+  }
+
+  .btn-freeze.unfreeze-mode:hover {
+    background: #6ee7b7;
+    color: #040605;
+  }
+
+  /* 可折叠 Information 详情抽屉（包含场馆销量信息 + market/vault/collection 合约地址） */
+  .ev-info-drawer {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    background: rgba(4, 7, 6, 0.82);
+    border-top: 1px solid transparent;
+    transition:
+      max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.28s ease,
+      border-color 0.28s ease;
+  }
+
+  .ev-info-drawer.open {
+    max-height: 160px;
+    opacity: 1;
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .ev-info-inner {
+    padding: 15px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .ev-metrics-drawer-line {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.78);
+    letter-spacing: 0.01em;
+  }
+
+  .ev-contracts-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.56);
+    padding-top: 10px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .contract-chip-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .contract-addr-link {
+    color: #86efac;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .contract-addr-link:hover {
+    color: #a7f3d0;
+    text-decoration: underline;
+  }
+
+  .btn-copy-mini {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .btn-copy-mini:hover {
+    color: #86efac;
+    background: rgba(110, 231, 183, 0.12);
+  }
+
+  /* ================= 7. 右侧栏：Signer Operations ================= */
+  .signer-ops-panel {
+    padding: 22px;
+  }
+
+  .ops-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+  }
+
+  .op-row {
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: background 0.2s;
+  }
+
+  .op-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .op-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .op-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .op-action-text {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.88);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .onchain-pill {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #6ee7b7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.66rem;
+    font-weight: 700;
+  }
+
+  .op-tx-link {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(134, 239, 172, 0.82);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    flex-shrink: 0;
+  }
+
+  .op-tx-link:hover {
+    color: #ffffff;
+  }
+
+  /* ================= 8. Freeze / Unfreeze 链上交易进度弹窗 ================= */
+  .tx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(2, 4, 3, 0.74);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tx-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 470px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(
+      160deg,
+      rgba(22, 34, 28, 0.86) 0%,
+      rgba(9, 13, 11, 0.94) 100%
+    );
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(134, 239, 172, 0.26);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.88),
+      0 0 50px rgba(52, 211, 153, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transform: translateY(16px) scale(0.96);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open .tx-modal-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .tx-modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 24px;
+  }
+
+  .tx-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .tx-step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .tx-step-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .step-indicator {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinTx 0.8s linear infinite;
+  }
+
+  @keyframes spinTx { to { transform: rotate(360deg); } }
+
+  .step-pending-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .step-done-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.45);
+  }
+
+  .tx-step-text {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .tx-step-text.muted { color: rgba(255, 255, 255, 0.45); }
+
+  .tx-step-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.48);
+    white-space: nowrap;
+  }
+
+  .tx-step-status.active { color: #86efac; }
+  .tx-step-status.done   { color: #6ee7b7; }
+
+  .btn-tx-action {
+    min-width: 124px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-tx-action.ready {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    cursor: pointer;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.35);
+  }
+
+  .btn-tx-action.ready:hover {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 1180px) {
+    .bento-grid { grid-template-columns: 1fr; }
+    .bento-right-col { position: static; }
+    .kpi-4-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 768px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .admin-shell { padding: 98px 20px 60px; }
+    .kpi-4-grid { grid-template-columns: 1fr; }
+    .ev-card-main-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html" class="active">Dashboard</a>
+      <a href="admin_list.html">List</a>
+      <a href="admin_setup.html">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="admin-shell">
+  <div class="dash-header-row">
+    <div class="dash-title-group">
+      <h1 class="dash-main-title">Dashboard</h1>
+      <span class="admin-role-pill">ADMIN CONSOLE</span>
+    </div>
+
+    <div class="dash-search-box">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="adminSearchInput" placeholder="Search events, contracts, tx hash...">
+    </div>
+  </div>
+
+  <div class="bento-grid">
+    <!-- ================= 左侧主区域 ================= -->
+    <div class="bento-left-col">
+      <!-- 1. 顶部 4 个格子 -->
+      <section class="kpi-4-grid">
+        <div class="kpi-card accent-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">SIGNER</div>
+            <div class="kpi-value">0xE52A...A921</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">PENDING PAYOUTS</div>
+            <div class="kpi-value">0</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">CHAIN INDEX</div>
+            <div class="kpi-value">0</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                <path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">EVENTS</div>
+            <div class="kpi-value">5</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 中部：Withdraw Requests -->
+      <section class="glass-panel withdraw-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Withdraw Requests</h2>
+          <span class="section-count-tag">2 Requests</span>
+        </div>
+
+        <div class="withdraw-list">
+          <div class="withdraw-item">
+            <div>
+              <div class="wd-title">Test 2 · 0.00 DxDAI</div>
+              <div class="wd-sub">0xb937...d78e · until 12/2/2026, 9:35:35 AM</div>
+            </div>
+            <span class="wd-status-badge pending">pending_vote</span>
+          </div>
+
+          <div class="withdraw-item">
+            <div>
+              <div class="wd-title">Test Event 1 · 10.00 DxDAI</div>
+              <div class="wd-sub">0xb937...d78e · opposed 0/1 · until 11/20/2026, 1:51:25 PM</div>
+            </div>
+            <span class="wd-status-badge done">done</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 底部：Events 5 个活动列表 + 可折叠 Information 抽屉 -->
+      <section class="glass-panel events-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Events</h2>
+          <span class="section-count-tag" id="eventsCountTag">5 Total Events</span>
+        </div>
+
+        <div class="events-list" id="adminEventsList"></div>
+      </section>
+    </div>
+
+    <!-- ================= 右侧独立侧栏：Signer Operations ================= -->
+    <aside class="bento-right-col">
+      <section class="glass-panel signer-ops-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Signer Operations</h2>
+          <span class="section-count-tag">10 Logs</span>
+        </div>
+
+        <div class="ops-list" id="signerOpsList"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<!-- Freeze / Unfreeze 链上交易进度弹窗 -->
+<div class="tx-modal-backdrop" id="freezeTxModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="freezeModalTitle">
+    <h3 class="tx-modal-title" id="freezeModalTitle">Freeze event contract</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="fStep1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="fStep1Text">Confirm freeze in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="fStep1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="fStep2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="fStep2Text">Update event state on-chain</span>
+        </div>
+        <span class="tx-step-status" id="fStep2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="freezeModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<script>
+  /* ================= 1. Sign out ================= */
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 5 个活动完整数据 ================= */
+  const adminEventsData = [
+    {
+      id: 1,
+      name: "KPOP CONCERT TICKET",
+      status: "Active",
+      statusClass: "active",
+      extraBadges: ["0% checked in"],
+      metrics: "SUC · sold 1/50 · gate 0 · vault 25.00 DxDAI",
+      market: "0xd044...4dc9",
+      vault: "0xdcb5...b229",
+      collection: "0xfec9...922d",
+      frozen: false,
+      infoExpanded: false
+    },
+    {
+      id: 2,
+      name: "kuanghuanjie",
+      status: "Active",
+      statusClass: "active",
+      extraBadges: ["0% checked in"],
+      metrics: "WAN XIANG TING · sold 1/12 · gate 0 · vault 40.00 DxDAI",
+      market: "0x8112...9a2c",
+      vault: "0xf1ee...36bb",
+      collection: "0xda73...e6d2",
+      frozen: false,
+      infoExpanded: false
+    },
+    {
+      id: 3,
+      name: "Test Event 3",
+      status: "Ended",
+      statusClass: "ended",
+      extraBadges: ["0% checked in"],
+      metrics: "115C · sold 1/12 · gate 0 · vault 10.00 DxDAI",
+      market: "0x3895...6f1e",
+      vault: "0x03bc...2375",
+      collection: "0x6976...ae0d",
+      frozen: false,
+      infoExpanded: false
+    },
+    {
+      id: 4,
+      name: "Test 2",
+      status: "Ended",
+      statusClass: "ended",
+      extraBadges: ["Vote 0/0", "0% checked in"],
+      metrics: "115 · sold 0/12 · gate 0 · vault 0.00 DxDAI",
+      market: "0xe687...c9b8",
+      vault: "0x10f3...8833",
+      collection: "0x8e47...8980",
+      frozen: false,
+      infoExpanded: false
+    },
+    {
+      id: 5,
+      name: "Test Event 1",
+      status: "Ended",
+      statusClass: "ended",
+      extraBadges: ["Withdrawn", "0% checked in"],
+      metrics: "115C · sold 1/12 · gate 0 · vault 0.00 DxDAI",
+      market: "0x5113...1dc1",
+      vault: "0x396b...bab7",
+      collection: "0x4c57...502e",
+      frozen: false,
+      infoExpanded: false
+    }
+  ];
+
+  /* ================= 3. 右侧 Signer Operations 10 条操作流水 ================= */
+  const signerOpsData = [
+    { action: "withdraw · Test Event 1", tx: "0xbc78309ae2..." },
+    { action: "list · kuanghuanjie", tx: "0x92bf51e18b..." },
+    { action: "buy_primary · kuanghuanjie", tx: "0x55f542f4c1..." },
+    { action: "mint · kuanghuanjie", tx: "0x2bbd2b5c4f..." },
+    { action: "buy_primary · KPOP CONCERT TICKET", tx: "0xfa7f6bad20..." },
+    { action: "mint · KPOP CONCERT TICKET", tx: "0x4757cf62f3..." },
+    { action: "buy_primary · Test Event 3", tx: "0x4bdc4d434d..." },
+    { action: "mint · Test Event 3", tx: "0x726a95b481..." },
+    { action: "mint · Test 2", tx: "0xa70503629b..." },
+    { action: "unfreeze · Test Event 1", tx: "0xf8011b6023..." }
+  ];
+
+  /* ================= 4. Freeze / Unfreeze 链上交易弹窗控制器 ================= */
+  const freezeTxModal = document.getElementById("freezeTxModal");
+  const freezeModalTitle = document.getElementById("freezeModalTitle");
+  const fStep1Icon = document.getElementById("fStep1Icon");
+  const fStep1Text = document.getElementById("fStep1Text");
+  const fStep1Status = document.getElementById("fStep1Status");
+  const fStep2Icon = document.getElementById("fStep2Icon");
+  const fStep2Text = document.getElementById("fStep2Text");
+  const fStep2Status = document.getElementById("fStep2Status");
+  const freezeModalActionBtn = document.getElementById("freezeModalActionBtn");
+
+  let pendingFreezeEventId = null;
+  let freezeTimers = [];
+
+  function clearFreezeTimers() {
+    freezeTimers.forEach(t => clearTimeout(t));
+    freezeTimers = [];
+  }
+
+  function openFreezeTxModal(eventItem) {
+    clearFreezeTimers();
+    pendingFreezeEventId = eventItem.id;
+    const willFreeze = !eventItem.frozen;
+
+    freezeModalTitle.textContent = willFreeze
+      ? `Freeze ${eventItem.name}`
+      : `Unfreeze ${eventItem.name}`;
+
+    fStep1Icon.innerHTML = `<span class="step-spinner"></span>`;
+    fStep1Text.textContent = willFreeze
+      ? "Confirm freeze in your wallet"
+      : "Confirm unfreeze in your wallet";
+    fStep1Text.classList.remove("muted");
+    fStep1Status.textContent = "In progress";
+    fStep1Status.className = "tx-step-status active";
+
+    fStep2Icon.innerHTML = `<span class="step-pending-dot"></span>`;
+    fStep2Text.textContent = willFreeze
+      ? "Freeze contract on-chain"
+      : "Restore contract on-chain";
+    fStep2Text.classList.add("muted");
+    fStep2Status.textContent = "Pending";
+    fStep2Status.className = "tx-step-status";
+
+    freezeModalActionBtn.disabled = true;
+    freezeModalActionBtn.classList.remove("ready");
+    freezeModalActionBtn.textContent = "Please wait";
+
+    freezeTxModal.classList.add("open");
+
+    freezeTimers.push(setTimeout(() => {
+      fStep1Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      fStep1Status.textContent = "Confirmed";
+      fStep1Status.className = "tx-step-status done";
+
+      fStep2Icon.innerHTML = `<span class="step-spinner"></span>`;
+      fStep2Text.classList.remove("muted");
+      fStep2Status.textContent = "In progress";
+      fStep2Status.className = "tx-step-status active";
+    }, 1300));
+
+    freezeTimers.push(setTimeout(() => {
+      fStep2Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      fStep2Status.textContent = "Recorded";
+      fStep2Status.className = "tx-step-status done";
+
+      freezeModalActionBtn.disabled = false;
+      freezeModalActionBtn.classList.add("ready");
+      freezeModalActionBtn.textContent = "Done";
+
+      if (pendingFreezeEventId !== null) {
+        const target = adminEventsData.find(e => e.id === pendingFreezeEventId);
+        if (target) {
+          target.frozen = !target.frozen;
+          const opPrefix = target.frozen ? "freeze" : "unfreeze";
+          signerOpsData.unshift({
+            action: `${opPrefix} · ${target.name}`,
+            tx: "0x" + Math.random().toString(16).slice(2, 12) + "..."
+          });
+          renderAdminDashboard();
+        }
+      }
+    }, 2600));
+  }
+
+  freezeModalActionBtn.addEventListener("click", () => {
+    if (!freezeModalActionBtn.disabled) {
+      clearFreezeTimers();
+      freezeTxModal.classList.remove("open");
+      pendingFreezeEventId = null;
+    }
+  });
+
+  window.toggleEventFreeze = function(eventId) {
+    const target = adminEventsData.find(e => e.id === eventId);
+    if (!target) return;
+    openFreezeTxModal(target);
+  };
+
+  /* ================= 5. 渲染 Events 列表与可折叠 Information 抽屉 ================= */
+  const adminEventsList = document.getElementById("adminEventsList");
+  const signerOpsList = document.getElementById("signerOpsList");
+  const eventsCountTag = document.getElementById("eventsCountTag");
+  const adminSearchInput = document.getElementById("adminSearchInput");
+
+  let searchQuery = "";
+
+  window.toggleInfoDrawer = function(eventId) {
+    const target = adminEventsData.find(e => e.id === eventId);
+    if (!target) return;
+    target.infoExpanded = !target.infoExpanded;
+    renderAdminDashboard();
+  };
+
+  window.copyContractText = function(btnEl, addr) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(addr).catch(() => {});
+    }
+    const prev = btnEl.textContent;
+    btnEl.textContent = "✓";
+    btnEl.style.color = "#6ee7b7";
+    setTimeout(() => {
+      btnEl.textContent = prev;
+      btnEl.style.color = "";
+    }, 1100);
+  };
+
+  function renderAdminDashboard() {
+    const q = searchQuery.trim().toLowerCase();
+
+    const filteredEvents = adminEventsData.filter(ev =>
+      !q ||
+      ev.name.toLowerCase().includes(q) ||
+      ev.metrics.toLowerCase().includes(q) ||
+      ev.market.toLowerCase().includes(q) ||
+      ev.vault.toLowerCase().includes(q) ||
+      ev.collection.toLowerCase().includes(q)
+    );
+
+    eventsCountTag.textContent = `${filteredEvents.length} of 5 Events`;
+
+    adminEventsList.innerHTML = filteredEvents.map(ev => {
+      const extraBadgesHtml = ev.extraBadges.map(b => {
+        const cls = b === "Withdrawn" ? "withdrawn" : "neutral";
+        return `<span class="ev-badge ${cls}">${b}</span>`;
+      }).join("");
+
+      const frozenBadgeHtml = ev.frozen
+        ? `<span class="ev-badge frozen">FROZEN</span>`
+        : "";
+
+      const isOpen = ev.infoExpanded;
+
+      return `
+        <article class="admin-event-card ${ev.frozen ? 'is-frozen' : ''}">
+          <div class="ev-card-main-row">
+            <div>
+              <div class="ev-badges-row">
+                <span class="ev-badge ${ev.statusClass}">${ev.status}</span>
+                ${frozenBadgeHtml}
+                ${extraBadgesHtml}
+              </div>
+
+              <div class="ev-name">${ev.name}</div>
+            </div>
+
+            <div class="ev-right-controls">
+              <button class="btn-info-toggle ${isOpen ? 'open' : ''}" type="button"
+                onclick="toggleInfoDrawer(${ev.id})">
+                ${isOpen ? "▼ Information" : "▶ Information"}
+              </button>
+
+              <button class="btn-freeze ${ev.frozen ? 'unfreeze-mode' : ''}" type="button"
+                onclick="toggleEventFreeze(${ev.id})">
+                ${ev.frozen ? "Unfreeze" : "Freeze"}
+              </button>
+            </div>
+          </div>
+
+          <!-- 可折叠 Information 抽屉（包含场馆/销量/金库信息 + 三个智能合约地址） -->
+          <div class="ev-info-drawer ${isOpen ? 'open' : ''}">
+            <div class="ev-info-inner">
+              <div class="ev-metrics-drawer-line">${ev.metrics}</div>
+
+              <div class="ev-contracts-row">
+                <div class="contract-chip-item">
+                  <span>Market:</span>
+                  <a href="#" class="contract-addr-link" onclick="event.preventDefault(); alert('Market Contract: ${ev.market}')">${ev.market} ↗</a>
+                  <button class="btn-copy-mini" type="button" title="Copy address" onclick="copyContractText(this, '${ev.market}')">⧉</button>
+                </div>
+
+                <div class="contract-chip-item">
+                  <span>Vault:</span>
+                  <a href="#" class="contract-addr-link" onclick="event.preventDefault(); alert('Vault Contract: ${ev.vault}')">${ev.vault} ↗</a>
+                  <button class="btn-copy-mini" type="button" title="Copy address" onclick="copyContractText(this, '${ev.vault}')">⧉</button>
+                </div>
+
+                <div class="contract-chip-item">
+                  <span>Collection (ERC-721):</span>
+                  <a href="#" class="contract-addr-link" onclick="event.preventDefault(); alert('Collection Contract: ${ev.collection}')">${ev.collection} ↗</a>
+                  <button class="btn-copy-mini" type="button" title="Copy address" onclick="copyContractText(this, '${ev.collection}')">⧉</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    const filteredOps = signerOpsData.filter(op =>
+      !q || op.action.toLowerCase().includes(q) || op.tx.toLowerCase().includes(q)
+    );
+
+    signerOpsList.innerHTML = filteredOps.map(op => `
+      <div class="op-row">
+        <div class="op-left">
+          <span class="op-action-text">${op.action}</span>
+          <span class="onchain-pill">on-chain</span>
+        </div>
+        <a href="#" class="op-tx-link" onclick="event.preventDefault(); alert('Viewing Transaction ${op.tx} on Explorer')">${op.tx}</a>
+      </div>
+    `).join("");
+  }
+
+  adminSearchInput.addEventListener("input", (e) => {
+    searchQuery = e.target.value;
+    renderAdminDashboard();
+  });
+
+  renderAdminDashboard();
+
+  /* ================= 6. 统一暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 85 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.5,
+    alpha: 0.15 + Math.random() * 0.45,
+    vy: -(0.08 + Math.random() * 0.2),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 26;
+  const RIBBON_SEGS = 100;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (smoothMouse.x > -500) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 220 && dist > 0.1) {
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = (0.02 + centerGlow * 0.065);
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+
+  function animate() {
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (smoothMouse.x > -500) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 180 && dist > 0.1) {
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a})`
+        : `rgba(255, 255, 255, ${a * 0.8})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+</script>
+</body>
+</html>
