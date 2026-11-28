@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin Setup</title>
+<link rel="stylesheet" href="css/admin_setup.css">
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html">Dashboard</a>
+      <a href="admin_list.html">List</a>
+      <a href="admin_setup.html" class="active">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span id="navBalanceText">0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="setup-dashboard-shell">
+  <!-- 左侧主工作区 -->
+  <div class="setup-left-col" id="setupLeftCol">
+    <!-- 顶部 Setup Status 三卡片 -->
+    <section class="setup-status-section">
+      <div class="section-heading-row">
+        <h1>Setup Status</h1>
+      </div>
+
+      <div class="status-cards-grid">
+        <div class="status-metric-card">
+          <span class="status-metric-title">1. Database</span>
+          <span class="status-pill-badge" id="statusDbBadge">Connected</span>
+        </div>
+
+        <div class="status-metric-card">
+          <span class="status-metric-title">2. IPFS Storage</span>
+          <span class="status-pill-badge" id="statusIpfsBadge">Connected</span>
+        </div>
+
+        <div class="status-metric-card">
+          <span class="status-metric-title">3. Signer Key</span>
+          <span class="status-pill-badge" id="statusSignerBadge">Ready</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 横向一排 3D 磨砂半透明立式小文件夹（Reset Application Data 放在最后一个） -->
+    <section class="pocket-folders-shelf" id="pocketFoldersShelf">
+      <!-- 1. KYC Isolated Database -->
+      <div class="pocket-folder-item" data-folder="kyc_db" id="folder-kyc_db">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">KYC</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">KYC Isolated Database</span>
+      </div>
+
+      <!-- 2. Database -->
+      <div class="pocket-folder-item" data-folder="main_db" id="folder-main_db">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">DB</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Database</span>
+      </div>
+
+      <!-- 3. IPFS & Pinata -->
+      <div class="pocket-folder-item" data-folder="ipfs" id="folder-ipfs">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">IPFS</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">IPFS &amp; Pinata</span>
+      </div>
+
+      <!-- 4. Network & Signer -->
+      <div class="pocket-folder-item" data-folder="network" id="folder-network">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">RPC</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Network &amp; Signer</span>
+      </div>
+
+      <!-- 5. Reset Application Data（放在最后一个） -->
+      <div class="pocket-folder-item" data-folder="reset" id="folder-reset">
+        <div class="pocket-3d-box">
+          <div class="pocket-back"></div>
+          <div class="pocket-docs-stack">
+            <div class="mini-doc-card doc-left"><span class="w-mid"></span><span class="w-short"></span></div>
+            <div class="mini-doc-card doc-right"><span class="w-short"></span><span class="w-mid"></span></div>
+            <div class="mini-doc-card doc-center"><span class="w-mid"></span><span class="w-short"></span><span></span></div>
+          </div>
+          <div class="pocket-front-glass">
+            <span class="pocket-watermark">RST</span>
+          </div>
+        </div>
+        <span class="pocket-folder-label">Reset Application Data</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- 右侧独立卡片栏（Testnet Faucet + Resale Royalty） -->
+  <aside class="setup-right-col">
+    <section class="side-widget-card">
+      <h2 class="side-widget-title">Testnet Faucet</h2>
+      <div class="faucet-status-row">
+        <span class="badge-dev-active" id="faucetModeBadge">Dev Active</span>
+        <a class="faucet-addr-link" id="faucetAddrLink" title="Copy Faucet Address">0xd4fd...369d</a>
+      </div>
+      <button class="btn-use-native" id="useNativeXdaiBtn" type="button">Use native xDAI</button>
+    </section>
+
+    <section class="side-widget-card">
+      <h2 class="side-widget-title">Resale Royalty (%)</h2>
+      <div class="royalty-input-row">
+        <input class="f-input" id="royaltyPercentInput" type="number" min="0" max="50" step="0.5" value="10">
+        <button class="btn-solid-mint" id="updateRoyaltyBtn" type="button">Update</button>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<!-- 点击小文件夹后始终居中展开的弹窗 -->
+<div class="folder-modal-backdrop" id="folderModalBackdrop">
+  <div class="receipt-paper-sheet" id="receiptPaperSheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- 两步链上交易进度确认弹窗（Use native xDAI & Update Royalty 触发） -->
+<div class="tx-modal-backdrop" id="txProgressModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="txModalTitle">
+    <h3 class="tx-modal-title" id="txModalTitle">Update resale royalty</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="step1Text">Confirm transaction in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="step1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="step2Text">Record configuration on-chain</span>
+        </div>
+        <span class="tx-step-status" id="step2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="txModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<div class="setup-toast" id="setupToast"></div>
+
+<script src="js/admin_setup.js"></script>
+</body>
+</html>

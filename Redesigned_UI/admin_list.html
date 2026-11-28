@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin List</title>
+<link rel="stylesheet" href="css/admin_list.css">
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html">Dashboard</a>
+      <a href="admin_list.html" class="active">List</a>
+      <a href="admin_setup.html">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="archive-stage" id="archiveStage">
+  <!-- 初始居中主标题区 -->
+  <div class="archive-hero-header">
+    <div class="kicker-pill">Admin Compliance &amp; Registry · <span>2 Active Folders</span></div>
+    <h1 class="archive-title">Admin <em>Directory</em></h1>
+    <p class="archive-subtitle">
+      Select a folder below to review anti-sybil KYC submissions or manage verified event organizers on-chain.
+    </p>
+  </div>
+
+  <!-- 点开文件夹后，表格像热敏打印机出收据一样向上滑出的展示槽 -->
+  <section class="receipt-printer-slot" id="receiptPrinterSlot">
+    <div class="receipt-clip-frame">
+      <div class="receipt-paper-sheet" id="receiptPaperSheet"></div>
+    </div>
+  </section>
+
+  <!-- 两个层叠实体文件夹：KYC 与 Organizers -->
+  <section class="folders-stack-container">
+    <div class="file-folder folder-kyc" id="folderKyc">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>KYC</span>
+          <span class="tab-count-pill" id="kycCountBadge">1</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">KYC Submissions</h2>
+          <p class="folder-desc">
+            Inspect attendee anti-sybil verification records, AES-256-GCM credential hashes, and document expiry statuses.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="kycActionPill" type="button">Open Folder →</button>
+      </div>
+    </div>
+
+    <div class="file-folder folder-organizers" id="folderOrganizers">
+      <div class="folder-tab-row">
+        <div class="folder-tab">
+          <span>Organizers</span>
+          <span class="tab-count-pill" id="orgCountBadge">1</span>
+        </div>
+      </div>
+      <div class="folder-body">
+        <div class="folder-halftone"></div>
+        <div class="folder-info-left">
+          <h2 class="folder-heading">Verified Organizers</h2>
+          <p class="folder-desc">
+            Whitelist new event organizer wallets or revoke on-chain event deployment permissions.
+          </p>
+        </div>
+        <button class="folder-action-pill" id="orgActionPill" type="button">Open Folder →</button>
+
+        <div class="folder-footer-strip">
+          <span>ON-CHAIN REGISTRY ARCHIVE</span>
+          <span>GNOSIS / DxDAI L2</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- KYC View 审核详情弹窗 -->
+<div class="kyc-modal-backdrop" id="kycDetailModal">
+  <div class="kyc-modal-card" role="dialog" aria-modal="true">
+    <button class="modal-close-x" id="closeKycModalBtn" type="button" title="Close">✕</button>
+    <div class="kyc-view-grid" id="kycModalContent"></div>
+  </div>
+</div>
+
+<!-- 证件扫描件全屏放大灯箱 -->
+<div class="photo-lightbox-backdrop" id="photoLightbox">
+  <img id="lightboxImg" src="" alt="Enlarged Credential Scan">
+  <div class="lightbox-hint">Click anywhere or press ESC to close enlarged preview</div>
+</div>
+
+<script src="js/admin_list.js"></script>
+</body>
+</html>

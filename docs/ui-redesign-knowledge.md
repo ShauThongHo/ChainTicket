@@ -8,17 +8,21 @@
 
 | 頁面 / 元件 | 原型來源 (`Redesigned_UI/`) | 系統對應檔案 |
 | :--- | :--- | :--- |
-| 共用深色殼層與導覽列 | `homepage.html` / `marketplace.html` / `1/custommer_marketplace.html` | `src/components/public-dark-shell.tsx`, `src/components/faucet-claim.tsx` |
+| 共用深色殼層與導覽列 | `homepage.html` / `marketplace.html` / `1/customer_marketplace.html` | `src/components/public-dark-shell.tsx`, `src/components/dark-shell-shared.tsx`, `src/components/faucet-claim.tsx` |
 | 全域深色主題樣式表 | `css/homepage.css`、`css/customer_my_ticket.css` 及各頁 `<style>` | `src/styles/public-dark.css` |
 | 首頁與 3D 範例票卡 | `homepage.html`, `css/homepage.css` | `src/routes/index.tsx` |
 | 拓樸波浪與星塵 Canvas | `js/homepage.js` | `src/components/topo-canvas.tsx` |
-| Marketplace 輪播與詳情抽屜 | `marketplace.html`, `1/custommer_marketplace.html` | `src/routes/marketplace.tsx` |
+| Marketplace 輪播與詳情抽屜 | `marketplace.html`, `1/customer_marketplace.html` | `src/routes/marketplace.tsx` |
 | My Tickets 未登入引導與 Ticket Archive 檔案館 | `my_ticket.html`（未登入）、`customer_my_ticket.html` / `css` / `js`（已登入） | `src/routes/my-tickets.tsx` |
+| Admin 深色殼層與樣式表 | `admin_dashboard.*`、`admin_list.*`、`admin_setup.*` | `src/components/admin-dark-shell.tsx`, `src/styles/admin-dark.css` |
+| Admin Dashboard | `admin_dashboard.html` / `css` / `js` | `src/routes/admin.tsx` |
+| Admin Directory（KYC & Verified Organizers） | `admin_list.html` / `css` / `js` | `src/components/admin-list-directory.tsx`, `src/routes/admin.kyc.tsx`, `src/routes/admin.organizers.tsx` |
+| Admin System Setup | `admin_setup.html` / `css` / `js` | `src/routes/admin.config.tsx` |
 
 ### 不可違反的邊界條件
-1. **作用域嚴格隔離**：深色樣式一律包裹在 `.ct-dark-theme`（與 `.ct-dark-theme.ct-home-viewport`）底下，不可更動 Organizer、Admin、KYC 與 `/events/$eventId` 的原本淺色頁面（`src/styles.css`）。
-2. **禁止臆造多餘元件與假資料**：不新增設計檔沒有的功能區塊或寫死假資料，資料一律來自真實 API 與會話狀態（`fetchHomeOverview`、`fetchEvents`、`fetchEvent`、`useSession`、`prepareBuyer`、`quoteBuy`、`buyNow`）。
-3. **不重複全域樣式污染**：所有公開頁專屬覆寫僅留在 `src/styles/public-dark.css`，保留 `src/styles.css` 給全站淺色介面。
+1. **作用域嚴格隔離**：公開頁深色樣式包裹在 `.ct-dark-theme`（與 `.ct-dark-theme.ct-home-viewport`），Admin 深色樣式額外限定於 `.ct-dark-theme.ct-admin-theme`（`src/styles/admin-dark.css`），不可更動 Organizer、KYC 與 `/events/$eventId` 的原本淺色頁面（`src/styles.css`）。
+2. **禁止臆造多餘元件與假資料**：不新增設計檔沒有的功能區塊或寫死假資料，資料一律來自真實 API 與會話狀態（`fetchHomeOverview`、`fetchEvents`、`fetchEvent`、`useSession`、`prepareBuyer`、`quoteBuy`、`buyNow` 及 Admin 的 `fetchInfra`、`fetchAdminEvents`、`fetchWithdrawals`、`fetchSignerOps`、`fetchPendingIndex`、`fetchKycQueue`、`fetchKycDetail`、`fetchKycPhoto`、`fetchOrganizers`）。
+3. **不重複全域樣式污染**：公開頁專屬覆寫留在 `src/styles/public-dark.css`，Admin 專屬覆寫留在 `src/styles/admin-dark.css`，保留 `src/styles.css` 給全站淺色介面。
 
 ---
 

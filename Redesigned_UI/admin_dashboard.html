@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Admin Dashboard</title>
+<link rel="stylesheet" href="css/admin_dashboard.css">
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="admin_dashboard.html" class="active">Dashboard</a>
+      <a href="admin_list.html">List</a>
+      <a href="admin_setup.html">Setup</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="admin-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xE52A...A921</span>
+      <span class="role-badge-admin">ADMIN</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="admin-shell">
+  <div class="dash-header-row">
+    <div class="dash-title-group">
+      <h1 class="dash-main-title">Dashboard</h1>
+      <span class="admin-role-pill">ADMIN CONSOLE</span>
+    </div>
+
+    <div class="dash-search-box">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="adminSearchInput" placeholder="Search events, contracts, tx hash...">
+    </div>
+  </div>
+
+  <div class="bento-grid">
+    <!-- ================= 左侧主区域 ================= -->
+    <div class="bento-left-col">
+      <!-- 1. 顶部 4 个格子 -->
+      <section class="kpi-4-grid">
+        <div class="kpi-card accent-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">SIGNER</div>
+            <div class="kpi-value">0xE52A...A921</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">PENDING PAYOUTS</div>
+            <div class="kpi-value">0</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">CHAIN INDEX</div>
+            <div class="kpi-value">0</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top-row">
+            <div class="kpi-icon-box">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                <path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="kpi-label">EVENTS</div>
+            <div class="kpi-value">5</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 中部：Withdraw Requests -->
+      <section class="glass-panel withdraw-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Withdraw Requests</h2>
+          <span class="section-count-tag">2 Requests</span>
+        </div>
+
+        <div class="withdraw-list">
+          <div class="withdraw-item">
+            <div>
+              <div class="wd-title">Test 2 · 0.00 DxDAI</div>
+              <div class="wd-sub">0xb937...d78e · until 12/2/2026, 9:35:35 AM</div>
+            </div>
+            <span class="wd-status-badge pending">pending_vote</span>
+          </div>
+
+          <div class="withdraw-item">
+            <div>
+              <div class="wd-title">Test Event 1 · 10.00 DxDAI</div>
+              <div class="wd-sub">0xb937...d78e · opposed 0/1 · until 11/20/2026, 1:51:25 PM</div>
+            </div>
+            <span class="wd-status-badge done">done</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 底部：Events 5 个活动列表 + 可折叠 Information 抽屉 -->
+      <section class="glass-panel events-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Events</h2>
+          <span class="section-count-tag" id="eventsCountTag">5 Total Events</span>
+        </div>
+
+        <div class="events-list" id="adminEventsList"></div>
+      </section>
+    </div>
+
+    <!-- ================= 右侧独立侧栏：Signer Operations ================= -->
+    <aside class="bento-right-col">
+      <section class="glass-panel signer-ops-panel">
+        <div class="section-header-bar">
+          <h2 class="section-title">Signer Operations</h2>
+          <span class="section-count-tag">10 Logs</span>
+        </div>
+
+        <div class="ops-list" id="signerOpsList"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<!-- Freeze / Unfreeze 链上交易进度弹窗 -->
+<div class="tx-modal-backdrop" id="freezeTxModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="freezeModalTitle">
+    <h3 class="tx-modal-title" id="freezeModalTitle">Freeze event contract</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="fStep1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="fStep1Text">Confirm freeze in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="fStep1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="fStep2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="fStep2Text">Update event state on-chain</span>
+        </div>
+        <span class="tx-step-status" id="fStep2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="freezeModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<script src="js/admin_dashboard.js"></script>
+</body>
+</html>

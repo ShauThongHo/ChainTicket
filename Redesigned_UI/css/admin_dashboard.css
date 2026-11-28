@@ -1,0 +1,985 @@
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Admin 顶部导航栏 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .admin-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(134, 239, 172, 0.24);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .admin-wallet-pill:hover {
+    border-color: rgba(134, 239, 172, 0.45);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 18px rgba(110, 231, 183, 0.14);
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr {
+    color: rgba(255, 255, 255, 0.82);
+    letter-spacing: -0.01em;
+  }
+
+  .role-badge-admin {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(110, 231, 183, 0.16);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #86efac;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover {
+    color: #fda4af;
+  }
+
+  /* ================= 3. 双栏 Bento Dashboard 主容器 ================= */
+  .admin-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 106px 48px 80px;
+  }
+
+  .dash-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .dash-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dash-main-title {
+    font-size: clamp(1.85rem, 3vw, 2.35rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+
+  .admin-role-pill {
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.28);
+    color: #86efac;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .dash-search-box {
+    width: 310px;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 21, 18, 0.72);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .dash-search-box:focus-within {
+    border-color: rgba(110, 231, 183, 0.45);
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.12);
+  }
+
+  .dash-search-box svg {
+    width: 15px;
+    height: 15px;
+    stroke: rgba(255, 255, 255, 0.45);
+    stroke-width: 2;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  .dash-search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 0.82rem;
+    user-select: text;
+  }
+
+  .dash-search-box input::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
+  .bento-grid {
+    display: grid;
+    grid-template-columns: 1fr 390px;
+    gap: 22px;
+    align-items: start;
+  }
+
+  .bento-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  .bento-right-col {
+    position: sticky;
+    top: 96px;
+  }
+
+  .glass-panel {
+    border-radius: 20px;
+    background: linear-gradient(
+      155deg,
+      rgba(16, 25, 21, 0.72) 0%,
+      rgba(8, 12, 10, 0.84) 100%
+    );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  .section-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .section-count-tag {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* ================= 4. 顶部 4 个格子 ================= */
+  .kpi-4-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .kpi-card {
+    position: relative;
+    padding: 20px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, rgba(16, 25, 21, 0.72) 0%, rgba(8, 12, 10, 0.84) 100%);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 138px;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(134, 239, 172, 0.32);
+  }
+
+  .kpi-card.accent-card {
+    background:
+      radial-gradient(circle at 85% 15%, rgba(110, 231, 183, 0.42) 0%, transparent 58%),
+      linear-gradient(145deg, #0f5138 0%, #07291c 65%, #051b13 100%);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    box-shadow:
+      0 20px 45px rgba(16, 185, 129, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  .kpi-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .kpi-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    display: grid;
+    place-items: center;
+    color: #86efac;
+  }
+
+  .kpi-card.accent-card .kpi-icon-box {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+  }
+
+  .kpi-icon-box svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+  }
+
+  .kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.56);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .kpi-card.accent-card .kpi-label {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .kpi-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.42rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  /* ================= 5. 中部：Withdraw Requests ================= */
+  .withdraw-panel {
+    padding: 22px 24px;
+  }
+
+  .withdraw-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+  }
+
+  .withdraw-item {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    transition: background 0.2s;
+  }
+
+  .withdraw-item:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .withdraw-item:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .wd-title {
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 5px;
+  }
+
+  .wd-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.52);
+  }
+
+  .wd-status-badge {
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .wd-status-badge.pending {
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+
+  .wd-status-badge.done {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    color: #6ee7b7;
+  }
+
+  /* ================= 6. 底部：Events 5个活动管理列表 + 可折叠 Information 抽屉 ================= */
+  .events-panel {
+    padding: 22px 24px;
+  }
+
+  .events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .admin-event-card {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    transition: border-color 0.22s, background 0.22s;
+  }
+
+  .admin-event-card:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(134, 239, 172, 0.28);
+  }
+
+  .admin-event-card.is-frozen {
+    border-color: rgba(244, 63, 94, 0.38);
+    background: rgba(244, 63, 94, 0.04);
+  }
+
+  .ev-card-main-row {
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .ev-badges-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .ev-badge {
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .ev-badge.active    { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(110, 231, 183, 0.42); color: #6ee7b7; }
+  .ev-badge.ended     { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.78); }
+  .ev-badge.withdrawn { background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; }
+  .ev-badge.frozen    { background: rgba(244, 63, 94, 0.22); border: 1px solid rgba(244, 63, 94, 0.48); color: #fda4af; }
+  .ev-badge.neutral   { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.65); font-family: monospace; }
+
+  .ev-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .ev-right-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ▶ / ▼ Information 可折叠触发按钮 */
+  .btn-info-toggle {
+    height: 38px;
+    padding: 0 15px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+
+  .btn-info-toggle:hover,
+  .btn-info-toggle.open {
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    background: rgba(110, 231, 183, 0.08);
+  }
+
+  .btn-freeze {
+    min-width: 88px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 9px;
+    border: 1px solid rgba(244, 63, 94, 0.48);
+    background: linear-gradient(145deg, rgba(190, 49, 49, 0.85) 0%, rgba(136, 28, 36, 0.92) 100%);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(225, 29, 72, 0.22);
+    transition: all 0.2s;
+  }
+
+  .btn-freeze:hover {
+    background: linear-gradient(145deg, rgba(225, 58, 58, 0.95) 0%, rgba(159, 32, 42, 0.98) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(225, 29, 72, 0.36);
+  }
+
+  .btn-freeze.unfreeze-mode {
+    background: rgba(110, 231, 183, 0.16);
+    border-color: rgba(110, 231, 183, 0.45);
+    color: #86efac;
+    box-shadow: none;
+  }
+
+  .btn-freeze.unfreeze-mode:hover {
+    background: #6ee7b7;
+    color: #040605;
+  }
+
+  /* 可折叠 Information 详情抽屉（包含场馆销量信息 + market/vault/collection 合约地址） */
+  .ev-info-drawer {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    background: rgba(4, 7, 6, 0.82);
+    border-top: 1px solid transparent;
+    transition:
+      max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.28s ease,
+      border-color 0.28s ease;
+  }
+
+  .ev-info-drawer.open {
+    max-height: 160px;
+    opacity: 1;
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .ev-info-inner {
+    padding: 15px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .ev-metrics-drawer-line {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.78);
+    letter-spacing: 0.01em;
+  }
+
+  .ev-contracts-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.56);
+    padding-top: 10px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .contract-chip-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .contract-addr-link {
+    color: #86efac;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .contract-addr-link:hover {
+    color: #a7f3d0;
+    text-decoration: underline;
+  }
+
+  .btn-copy-mini {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .btn-copy-mini:hover {
+    color: #86efac;
+    background: rgba(110, 231, 183, 0.12);
+  }
+
+  /* ================= 7. 右侧栏：Signer Operations ================= */
+  .signer-ops-panel {
+    padding: 22px;
+  }
+
+  .ops-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+  }
+
+  .op-row {
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: background 0.2s;
+  }
+
+  .op-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .op-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .op-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .op-action-text {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.88);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .onchain-pill {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(110, 231, 183, 0.36);
+    color: #6ee7b7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.66rem;
+    font-weight: 700;
+  }
+
+  .op-tx-link {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(134, 239, 172, 0.82);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    flex-shrink: 0;
+  }
+
+  .op-tx-link:hover {
+    color: #ffffff;
+  }
+
+  /* ================= 8. Freeze / Unfreeze 链上交易进度弹窗 ================= */
+  .tx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(2, 4, 3, 0.74);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tx-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 470px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(
+      160deg,
+      rgba(22, 34, 28, 0.86) 0%,
+      rgba(9, 13, 11, 0.94) 100%
+    );
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(134, 239, 172, 0.26);
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.88),
+      0 0 50px rgba(52, 211, 153, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transform: translateY(16px) scale(0.96);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open .tx-modal-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .tx-modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 24px;
+  }
+
+  .tx-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .tx-step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .tx-step-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .step-indicator {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinTx 0.8s linear infinite;
+  }
+
+  @keyframes spinTx { to { transform: rotate(360deg); } }
+
+  .step-pending-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .step-done-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.45);
+  }
+
+  .tx-step-text {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .tx-step-text.muted { color: rgba(255, 255, 255, 0.45); }
+
+  .tx-step-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.48);
+    white-space: nowrap;
+  }
+
+  .tx-step-status.active { color: #86efac; }
+  .tx-step-status.done   { color: #6ee7b7; }
+
+  .btn-tx-action {
+    min-width: 124px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-tx-action.ready {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    cursor: pointer;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.35);
+  }
+
+  .btn-tx-action.ready:hover {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 1180px) {
+    .bento-grid { grid-template-columns: 1fr; }
+    .bento-right-col { position: static; }
+    .kpi-4-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 768px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .admin-shell { padding: 98px 20px 60px; }
+    .kpi-4-grid { grid-template-columns: 1fr; }
+    .ev-card-main-row { flex-direction: column; align-items: flex-start; }
+  }

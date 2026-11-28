@@ -1,16 +1,10 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
-import { PhaseBadge } from "@/components/phase-badge";
+import { AdminAccessGate, AdminDarkShell } from "@/components/admin-dark-shell";
 import { useSession } from "@/components/session";
 import { ChainDialog, useChainRun } from "@/components/tx-dialog";
-import { Hint } from "@/components/hint";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
-  claimPlatformAdmin,
   decidePayout,
   dismissPendingIndex,
   fetchAdminEvents,
@@ -21,10 +15,16 @@ import {
   freezeShow,
   retryPendingIndex,
 } from "@/lib/api";
-import { explorerAddress, explorerTx, gatewayUrl } from "@/lib/explorer";
 import { friendlyChainError } from "@/lib/chain-errors";
-import type { InfraStatus, LedgerRow, OrganizerEvent, PendingIndexRow, WithdrawRequest } from "@/lib/types";
-import { checkInPct, formatAmount, paySymbol, shortAddr } from "@/lib/utils";
+import { explorerAddress, explorerTx, gatewayUrl } from "@/lib/explorer";
+import type {
+  InfraStatus,
+  LedgerRow,
+  OrganizerEvent,
+  PendingIndexRow,
+  WithdrawRequest,
+} from "@/lib/types";
+import { checkInPct, formatAmount, paySymbol, phaseLabel, shortAddr } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({ component: AdminLayout });
 
@@ -34,14 +34,23 @@ function AdminLayout() {
   return <AdminDashboard />;
 }
 
+function withdrawBadgeClass(status: WithdrawRequest["status"]) {
+  if (status === "done" || status === "approved" || status === "passed") return "done";
+  if (status === "rejected") return "rejected";
+  return "pending";
+}
+
 function AdminDashboard() {
-  const { me, refresh, config } = useSession();
+  const { me, config } = useSession();
   const navigate = useNavigate();
   const [infra, setInfra] = useState<InfraStatus | null>(null);
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
   const [payouts, setPayouts] = useState<WithdrawRequest[]>([]);
   const [ops, setOps] = useState<LedgerRow[]>([]);
   const [pending, setPending] = useState<PendingIndexRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedEvents, setExpandedEvents] = useState<Record<number, boolean>>({});
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const chain = useChainRun();
   const symbol = paySymbol(config);
@@ -70,7 +79,11 @@ function AdminDashboard() {
     setBusy(id);
     try {
       await chain.run({
-        title: id.startsWith("frz-") ? "Update event access" : id.startsWith("payout-") || id.startsWith("reject-") ? "Review payout" : "Update event record",
+        title: id.startsWith("frz-")
+          ? "Update event access"
+          : id.startsWith("payout-") || id.startsWith("reject-")
+            ? "Review payout"
+            : "Update event record",
         labels,
         task: async (tick) => {
           await fn(tick);
@@ -85,353 +98,580 @@ function AdminDashboard() {
     }
   }
 
-  if (!me) {
-    return (
-      <AppShell>
-        <p className="text-sm text-muted">Connect a wallet.</p>
-      </AppShell>
-    );
+  function copyAddress(key: string, value: string) {
+    if (!value) return;
+    navigator.clipboard?.writeText(value).catch(() => undefined);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey((cur) => (cur === key ? null : cur));
+    }, 1100);
   }
 
-  if (!me.isAdmin) {
+  function toggleInfoDrawer(eventId: number) {
+    setExpandedEvents((prev) => ({ ...prev, [eventId]: !prev[eventId] }));
+  }
+
+  const q = searchQuery.trim().toLowerCase();
+
+  const filteredEvents = useMemo(() => {
+    if (!q) return events;
+    return events.filter(
+      (ev) =>
+        ev.name.toLowerCase().includes(q) ||
+        ev.venue.toLowerCase().includes(q) ||
+        (ev.marketplaceAddress ?? "").toLowerCase().includes(q) ||
+        (ev.vaultAddress ?? "").toLowerCase().includes(q) ||
+        (ev.collectionAddress ?? "").toLowerCase().includes(q),
+    );
+  }, [events, q]);
+
+  const filteredPayouts = useMemo(() => {
+    if (!q) return payouts;
+    return payouts.filter(
+      (p) =>
+        p.eventName.toLowerCase().includes(q) ||
+        p.organizerWallet.toLowerCase().includes(q) ||
+        p.status.toLowerCase().includes(q) ||
+        (p.txHash ?? "").toLowerCase().includes(q),
+    );
+  }, [payouts, q]);
+
+  const filteredPending = useMemo(() => {
+    if (!q) return pending;
+    return pending.filter(
+      (row) =>
+        row.kind.toLowerCase().includes(q) ||
+        row.txHash.toLowerCase().includes(q) ||
+        (row.error ?? "").toLowerCase().includes(q),
+    );
+  }, [pending, q]);
+
+  const filteredOps = useMemo(() => {
+    if (!q) return ops;
+    return ops.filter(
+      (row) =>
+        row.kind.toLowerCase().includes(q) ||
+        (row.eventName ?? "").toLowerCase().includes(q) ||
+        row.ref.toLowerCase().includes(q),
+    );
+  }, [ops, q]);
+
+  if (!me || !me.isAdmin) {
     return (
-      <AppShell>
-        <h1 className="font-display text-4xl italic">Admin</h1>
-        <Card className="mt-6 max-w-lg p-5">
-          <p className="text-sm">
-            This wallet is not the platform admin. The bootstrap file holds only the <strong>public</strong>{" "}
-            admin wallet address — never a private key. Put that address in before start, or save this
-            wallet once if none is configured yet. Operator keys, Pinata JWT and the database URL are
-            stored in the connected database from Configuration.
-          </p>
-          {!config?.adminConfigured ? (
-            <Button
-              className="mt-4"
-              onClick={() =>
-                void (async () => {
-                  await claimPlatformAdmin();
-                  await refresh();
-                  toast.success("Saved as platform admin");
-                  navigate({ to: "/admin" });
-                })()
-              }
-            >
-              Save this wallet as platform admin
-            </Button>
-          ) : null}
-        </Card>
-      </AppShell>
+      <AdminDarkShell>
+        <AdminAccessGate allowClaimAdmin />
+      </AdminDarkShell>
     );
   }
 
   const incomplete = infra && !infra.setup.complete;
+  const pendingPayoutCount = payouts.filter(
+    (p) => p.status === "pending" || p.status === "escalated",
+  ).length;
 
   return (
-    <AppShell>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
-        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-fg">
-          Admin Console
-        </h1>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin/kyc" })}>
-            KYC
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void navigate({ to: "/admin/organizers" })}>
-            Organizers
-          </Button>
-          <Button size="sm" onClick={() => void navigate({ to: "/admin/config" })}>
-            Settings
-          </Button>
+    <AdminDarkShell>
+      <main className="admin-shell">
+        <div className="dash-header-row">
+          <div className="dash-title-group">
+            <h1 className="dash-main-title">Dashboard</h1>
+            <span className="admin-role-pill">ADMIN CONSOLE</span>
+          </div>
+
+          <div className="dash-search-box">
+            <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search events, contracts, tx hash..."
+              aria-label="Search admin dashboard"
+            />
+          </div>
         </div>
-      </div>
 
-      {incomplete ? (
-        <Card className="mt-5 p-4 flex flex-wrap items-center justify-between gap-3 border-primary/40 bg-primary/5">
-          <p className="text-sm font-medium text-fg">Platform setup incomplete (Database, Storage, or Signer key required).</p>
-          <Button size="sm" onClick={() => void navigate({ to: "/admin/config" })}>
-            Configure
-          </Button>
-        </Card>
-      ) : null}
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Signer</p>
-          <p className="mt-2 font-mono text-sm">
-            {infra?.chain.operatorAddress ? shortAddr(infra.chain.operatorAddress) : "Not set"}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Pending Payouts</p>
-          <p className="mt-2 font-mono text-2xl tabular-nums">
-            {payouts.filter((p) => p.status === "pending" || p.status === "escalated").length}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Chain Index</p>
-          <p className="mt-2 font-mono text-2xl tabular-nums">{pending.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Events</p>
-          <p className="mt-2 font-mono text-2xl tabular-nums">{events.length}</p>
-        </Card>
-      </div>
-
-      <ChainDialog {...chain} onClose={chain.close} />
-
-      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Chain Index</h2>
-      <div className="mt-3 divide-y divide-border rounded-xl border border-border">
-        {pending.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">No pending index rows.</p>
+        {incomplete ? (
+          <div className="setup-alert-bar">
+            <span className="setup-alert-text">
+              Platform setup incomplete (Database, Storage, or Signer key required).
+            </span>
+            <button
+              type="button"
+              className="btn-mini-mint"
+              onClick={() => void navigate({ to: "/admin/config" })}
+            >
+              Configure →
+            </button>
+          </div>
         ) : null}
-        {pending.map((row) => (
-          <div key={row.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge>{row.kind}</Badge>
-                <span className="font-mono text-xs text-muted">
-                  {new Date(row.createdAt).toLocaleString()}
+
+        <div className="bento-grid">
+          <div className="bento-left-col">
+            {/* Top 4 KPI Cards */}
+            <section className="kpi-4-grid">
+              <div className="kpi-card accent-card">
+                <div className="kpi-top-row">
+                  <div className="kpi-icon-box">
+                    <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="kpi-label">SIGNER</div>
+                  <div className="kpi-value">
+                    {infra?.chain.operatorAddress ? shortAddr(infra.chain.operatorAddress) : "Not set"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-top-row">
+                  <div className="kpi-icon-box">
+                    <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="kpi-label">PENDING PAYOUTS</div>
+                  <div className="kpi-value">{pendingPayoutCount}</div>
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-top-row">
+                  <div className="kpi-icon-box">
+                    <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="kpi-label">CHAIN INDEX</div>
+                  <div className="kpi-value">{pending.length}</div>
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-top-row">
+                  <div className="kpi-icon-box">
+                    <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                      <path d="M13 5v2" />
+                      <path d="M13 17v2" />
+                      <path d="M13 11v2" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="kpi-label">EVENTS</div>
+                  <div className="kpi-value">{events.length}</div>
+                </div>
+              </div>
+            </section>
+
+            {/* Chain Index (shown when lagged index rows exist) */}
+            {pending.length > 0 ? (
+              <section className="glass-panel withdraw-panel">
+                <div className="section-header-bar">
+                  <h2 className="section-title">Chain Index</h2>
+                  <span className="section-count-tag">
+                    {filteredPending.length} Pending
+                  </span>
+                </div>
+
+                <div className="withdraw-list">
+                  {filteredPending.length === 0 ? (
+                    <div className="empty-list-note">No matching pending index rows.</div>
+                  ) : (
+                    filteredPending.map((row) => (
+                      <div key={row.id} className="withdraw-item">
+                        <div className="min-w-0">
+                          <div className="wd-title flex flex-wrap items-center gap-2">
+                            <span className="ev-badge neutral">{row.kind}</span>
+                            <span className="wd-sub">
+                              {new Date(row.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="wd-sub mt-1">
+                            <a
+                              className="op-tx-link"
+                              href={explorerTx(row.txHash, explorer)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {row.txHash.slice(0, 18)}…
+                            </a>
+                            {row.error ? (
+                              <span className="ml-2 text-rose-300">{row.error}</span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="wd-actions-grp">
+                          <button
+                            type="button"
+                            className="btn-mini-mint"
+                            disabled={busy !== null}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  "Replay this on-chain transaction into the index? The receipt is the source of truth.",
+                                )
+                              ) {
+                                return;
+                              }
+                              void runOp(
+                                `retry-${row.id}`,
+                                ["Read receipt", "Wait one block", "Update index"],
+                                async (tick) => {
+                                  tick(1);
+                                  await retryPendingIndex({ data: { id: row.id } });
+                                  tick(3);
+                                  await load();
+                                  toast.success("Index replayed from chain");
+                                },
+                              );
+                            }}
+                          >
+                            Retry index
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-mini-outline"
+                            disabled={busy !== null}
+                            onClick={() => {
+                              if (!window.confirm("Mark this as resolved without changing the index?"))
+                                return;
+                              void runOp(`dismiss-${row.id}`, ["Mark resolved"], async (tick) => {
+                                tick(0);
+                                await dismissPendingIndex({ data: { id: row.id } });
+                                tick(1);
+                                await load();
+                                toast.success("Dismissed");
+                              });
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            ) : null}
+
+            {/* Withdraw Requests */}
+            <section className="glass-panel withdraw-panel">
+              <div className="section-header-bar">
+                <h2 className="section-title">Withdraw Requests</h2>
+                <span className="section-count-tag">
+                  {q
+                    ? `${filteredPayouts.length} of ${payouts.length} Requests`
+                    : `${payouts.length} ${payouts.length === 1 ? "Request" : "Requests"}`}
                 </span>
               </div>
-              <p className="mt-1 font-mono text-xs">
-                <a
-                  className="text-primary underline"
-                  href={explorerTx(row.txHash, explorer)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {row.txHash.slice(0, 18)}…
-                </a>
-              </p>
-              {row.error ? <p className="mt-1 text-xs text-danger">{row.error}</p> : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                disabled={busy !== null}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Replay this on-chain transaction into the index? The receipt is the source of truth.",
-                    )
-                  ) {
-                    return;
-                  }
-                  void runOp(`retry-${row.id}`, ["Read receipt", "Wait one block", "Update index"], async (tick) => {
-                    tick(1);
-                    await retryPendingIndex({ data: { id: row.id } });
-                    tick(3);
-                    await load();
-                    toast.success("Index replayed from chain");
-                  });
-                }}
-              >
-                Retry index
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy !== null}
-                onClick={() => {
-                  if (!window.confirm("Mark this as resolved without changing the index?")) return;
-                  void runOp(`dismiss-${row.id}`, ["Mark resolved"], async (tick) => {
-                    tick(0);
-                    await dismissPendingIndex({ data: { id: row.id } });
-                    tick(1);
-                    await load();
-                    toast.success("Dismissed");
-                  });
-                }}
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Withdraw Requests</h2>
-      <div className="mt-3 divide-y divide-border rounded-xl border border-border">
-        {payouts.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">No requests yet.</p>
-        ) : null}
-        {payouts.map((p) => (
-          <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-            <div>
-              <p className="text-sm">
-                {p.eventName} · {formatAmount(p.amountCents, symbol)}
-              </p>
-              <p className="font-mono text-xs text-muted">
-                {shortAddr(p.organizerWallet)}
-                {p.soldWeight || p.yesWeight ? ` · ${p.engineVersion && p.engineVersion >= 4 ? "opposed" : "support"} ${p.yesWeight}/${p.soldWeight}` : ""}
-                {p.deadline ? ` · until ${new Date(p.deadline).toLocaleString()}` : ""}
-              </p>
-              {p.materialsUri ? (
-                <a
-                  className="font-mono text-xs text-primary underline"
-                  href={gatewayUrl(p.materialsUri, config?.ipfsGateway)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  materials
-                </a>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={p.status === "done" ? "sage" : p.status === "rejected" ? "danger" : "mist"}>
-                {p.status}
-              </Badge>
-              {p.status === "pending" || p.status === "escalated" ? (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      void runOp(`payout-${p.id}`, ["Review request", "Withdraw on-chain", "Index"], async (tick) => {
-                        tick(1);
-                        await decidePayout({ data: { requestId: p.id, approve: true } });
-                        tick(3);
-                        await load();
-                        toast.success("Payout sent");
-                      })
-                    }
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      void runOp(`reject-${p.id}`, ["Reject request", "Update index"], async (tick) => {
-                        tick(0);
-                        await decidePayout({ data: { requestId: p.id, approve: false } });
-                        tick(2);
-                        await load();
-                        toast.success("Rejected — vault stays locked to holders");
-                      })
-                    }
-                  >
-                    Reject
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ))}
-      </div>
+              <div className="withdraw-list">
+                {filteredPayouts.length === 0 ? (
+                  <div className="empty-list-note">
+                    {payouts.length === 0 ? "No requests yet." : "No matching withdraw requests."}
+                  </div>
+                ) : (
+                  filteredPayouts.map((p) => (
+                    <div key={p.id} className="withdraw-item">
+                      <div>
+                        <div className="wd-title">
+                          {p.eventName} · {formatAmount(p.amountCents, symbol)}
+                        </div>
+                        <div className="wd-sub">
+                          {shortAddr(p.organizerWallet)}
+                          {p.soldWeight || p.yesWeight
+                            ? ` · ${p.engineVersion && p.engineVersion >= 4 ? "opposed" : "support"} ${p.yesWeight}/${p.soldWeight}`
+                            : ""}
+                          {p.deadline ? ` · until ${new Date(p.deadline).toLocaleString()}` : ""}
+                          {p.materialsUri ? (
+                            <>
+                              {" · "}
+                              <a
+                                className="op-tx-link"
+                                href={gatewayUrl(p.materialsUri, config?.ipfsGateway)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                materials
+                              </a>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
 
-      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Events</h2>
-      <div className="mt-3 grid gap-3">
-        {events.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">No events yet.</Card>
-        ) : null}
-        {events.map((ev) => (
-          <Card key={ev.id} className="p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap gap-2">
-                  <PhaseBadge phase={ev.phase} />
-                  {ev.frozen ? <Badge tone="danger">Frozen</Badge> : null}
-                  {ev.withdrawn ? <Badge tone="ink">Withdrawn</Badge> : null}
-                  {ev.engineVersion < 3 ? <Badge>Legacy</Badge> : null}
-                  {ev.engineVersion >= 3 && !ev.collectionAddress ? <Badge tone="danger">No NFT</Badge> : null}
-                  {ev.withdrawRequest === "pending_vote" ? (
-                    <Badge>
-                      Vote {ev.proposalYes}/{ev.proposalSold}
-                    </Badge>
-                  ) : null}
-                  {ev.withdrawRequest === "escalated" ? <Badge tone="danger">Escalated</Badge> : null}
-                  <Badge>{checkInPct(ev.checkInRate)} checked in</Badge>
-                </div>
-                <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-fg">{ev.name}</h3>
-                <p className="text-sm text-muted">
-                  {ev.venue} · sold {ev.sold}/{ev.supply} · gate {ev.checkedIn} · vault{" "}
-                  {formatAmount(ev.lockedCents, symbol)}
-                </p>
-                {ev.marketplaceAddress ? (
-                  <p className="mt-1 font-mono text-xs text-muted">
-                    <a
-                      className="text-primary underline"
-                      href={explorerAddress(ev.marketplaceAddress, explorer)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      market {shortAddr(ev.marketplaceAddress)}
-                    </a>
-                    {" · "}
-                    <a
-                      className="text-primary underline"
-                      href={explorerAddress(ev.vaultAddress ?? "", explorer)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      vault {shortAddr(ev.vaultAddress ?? "")}
-                    </a>
-                    {ev.collectionAddress ? (
-                      <>
-                        {" · "}
+                      <div className="wd-actions-grp">
+                        <span className={`wd-status-badge ${withdrawBadgeClass(p.status)}`}>
+                          {p.status}
+                        </span>
+                        {p.status === "pending" || p.status === "escalated" ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-mini-mint"
+                              disabled={busy !== null}
+                              onClick={() =>
+                                void runOp(
+                                  `payout-${p.id}`,
+                                  ["Review request", "Withdraw on-chain", "Index"],
+                                  async (tick) => {
+                                    tick(1);
+                                    await decidePayout({ data: { requestId: p.id, approve: true } });
+                                    tick(3);
+                                    await load();
+                                    toast.success("Payout sent");
+                                  },
+                                )
+                              }
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-mini-outline"
+                              disabled={busy !== null}
+                              onClick={() =>
+                                void runOp(
+                                  `reject-${p.id}`,
+                                  ["Reject request", "Update index"],
+                                  async (tick) => {
+                                    tick(0);
+                                    await decidePayout({
+                                      data: { requestId: p.id, approve: false },
+                                    });
+                                    tick(2);
+                                    await load();
+                                    toast.success("Rejected — vault stays locked to holders");
+                                  },
+                                )
+                              }
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            {/* Events List + Collapsible Information Drawer */}
+            <section className="glass-panel events-panel">
+              <div className="section-header-bar">
+                <h2 className="section-title">Events</h2>
+                <span className="section-count-tag">
+                  {q
+                    ? `${filteredEvents.length} of ${events.length} Events`
+                    : `${events.length} Total Events`}
+                </span>
+              </div>
+
+              <div className="events-list">
+                {filteredEvents.length === 0 ? (
+                  <div className="empty-list-note">
+                    {events.length === 0 ? "No events yet." : "No matching events found."}
+                  </div>
+                ) : (
+                  filteredEvents.map((ev) => {
+                    const isOpen = Boolean(expandedEvents[ev.id]);
+                    const contracts = [
+                      ev.marketplaceAddress
+                        ? {
+                            key: `mkt-${ev.id}`,
+                            label: "Market:",
+                            addr: ev.marketplaceAddress,
+                          }
+                        : null,
+                      ev.vaultAddress
+                        ? {
+                            key: `vlt-${ev.id}`,
+                            label: "Vault:",
+                            addr: ev.vaultAddress,
+                          }
+                        : null,
+                      ev.collectionAddress
+                        ? {
+                            key: `col-${ev.id}`,
+                            label: "Collection (ERC-721):",
+                            addr: ev.collectionAddress,
+                          }
+                        : null,
+                    ].filter((c): c is { key: string; label: string; addr: string } => Boolean(c));
+
+                    return (
+                      <article
+                        key={ev.id}
+                        className={`admin-event-card${ev.frozen ? " is-frozen" : ""}`}
+                      >
+                        <div className="ev-card-main-row">
+                          <div>
+                            <div className="ev-badges-row">
+                              <span className={`ev-badge ${ev.phase}`}>{phaseLabel(ev.phase)}</span>
+                              {ev.frozen ? <span className="ev-badge frozen">FROZEN</span> : null}
+                              {ev.withdrawn ? (
+                                <span className="ev-badge withdrawn">Withdrawn</span>
+                              ) : null}
+                              {ev.engineVersion < 3 ? (
+                                <span className="ev-badge neutral">Legacy</span>
+                              ) : null}
+                              {ev.engineVersion >= 3 && !ev.collectionAddress ? (
+                                <span className="ev-badge frozen">No NFT</span>
+                              ) : null}
+                              {ev.withdrawRequest === "pending_vote" ? (
+                                <span className="ev-badge neutral">
+                                  Vote {ev.proposalYes}/{ev.proposalSold}
+                                </span>
+                              ) : null}
+                              {ev.withdrawRequest === "escalated" ? (
+                                <span className="ev-badge frozen">Escalated</span>
+                              ) : null}
+                              <span className="ev-badge neutral">
+                                {checkInPct(ev.checkInRate)} checked in
+                              </span>
+                            </div>
+
+                            <div className="ev-name">{ev.name}</div>
+                          </div>
+
+                          <div className="ev-right-controls">
+                            <button
+                              type="button"
+                              className={`btn-info-toggle${isOpen ? " open" : ""}`}
+                              onClick={() => toggleInfoDrawer(ev.id)}
+                            >
+                              {isOpen ? "▼ Information" : "▶ Information"}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`btn-freeze${ev.frozen ? " unfreeze-mode" : ""}`}
+                              disabled={busy !== null}
+                              onClick={() =>
+                                void runOp(
+                                  `frz-${ev.id}`,
+                                  ["Sign freeze", "Wait one block", "Update index"],
+                                  async (tick) => {
+                                    tick(0);
+                                    await freezeShow({ data: { eventId: ev.id, on: !ev.frozen } });
+                                    tick(3);
+                                    await load();
+                                    toast.success(ev.frozen ? "Unfrozen" : "Frozen");
+                                  },
+                                )
+                              }
+                            >
+                              {ev.frozen ? "Unfreeze" : "Freeze"}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={`ev-info-drawer${isOpen ? " open" : ""}`}>
+                          <div className="ev-info-inner">
+                            <div className="ev-metrics-drawer-line">
+                              {ev.venue || "TBA"} · sold {ev.sold}/{ev.supply} · gate{" "}
+                              {ev.checkedIn} · vault {formatAmount(ev.lockedCents, symbol)}
+                            </div>
+
+                            {contracts.length > 0 ? (
+                              <div className="ev-contracts-row">
+                                {contracts.map((c) => (
+                                  <div key={c.key} className="contract-chip-item">
+                                    <span>{c.label}</span>
+                                    <a
+                                      href={explorerAddress(c.addr, explorer)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="contract-addr-link"
+                                    >
+                                      {shortAddr(c.addr)} ↗
+                                    </a>
+                                    <button
+                                      type="button"
+                                      className={`btn-copy-mini${copiedKey === c.key ? " copied" : ""}`}
+                                      title="Copy address"
+                                      onClick={() => copyAddress(c.key, c.addr)}
+                                    >
+                                      {copiedKey === c.key ? "✓" : "⧉"}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Right Sticky Sidebar: Signer Operations */}
+          <aside className="bento-right-col">
+            <section className="glass-panel signer-ops-panel">
+              <div className="section-header-bar">
+                <h2 className="section-title">Signer Operations</h2>
+                <span className="section-count-tag">
+                  {filteredOps.length} {filteredOps.length === 1 ? "Log" : "Logs"}
+                </span>
+              </div>
+
+              <div className="ops-list">
+                {filteredOps.length === 0 ? (
+                  <div className="empty-list-note">
+                    {ops.length === 0
+                      ? "No indexed operations yet."
+                      : "No matching operations."}
+                  </div>
+                ) : (
+                  filteredOps.map((row) => (
+                    <div key={row.id} className="op-row">
+                      <div className="op-left">
+                        <span className="op-action-text">
+                          {row.kind}
+                          {row.eventName ? ` · ${row.eventName}` : ""}
+                        </span>
+                        <span className={row.onChain ? "onchain-pill" : "index-pill"}>
+                          {row.onChain ? "on-chain" : "index"}
+                        </span>
+                      </div>
+                      {row.onChain ? (
                         <a
-                          className="text-primary underline"
-                          href={explorerAddress(ev.collectionAddress, explorer)}
+                          href={explorerTx(row.ref, explorer)}
                           target="_blank"
                           rel="noreferrer"
+                          className="op-tx-link"
                         >
-                          collection {shortAddr(ev.collectionAddress)}
+                          {row.ref.slice(0, 12)}…
                         </a>
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
+                      ) : (
+                        <span className="wd-sub">{row.ref.slice(0, 18)}</span>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
-              <Button
-                variant={ev.frozen ? "outline" : "danger"}
-                disabled={busy !== null}
-                onClick={() =>
-                  void runOp(`frz-${ev.id}`, ["Sign freeze", "Wait one block", "Update index"], async (tick) => {
-                    tick(0);
-                    await freezeShow({ data: { eventId: ev.id, on: !ev.frozen } });
-                    tick(3);
-                    await load();
-                    toast.success(ev.frozen ? "Unfrozen" : "Frozen");
-                  })
-                }
-              >
-                {ev.frozen ? "Unfreeze" : "Freeze"}
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </section>
+          </aside>
+        </div>
 
-      <h2 className="mt-8 font-display text-2xl font-bold tracking-tight text-fg">Signer Operations</h2>
-      <div className="mt-3 divide-y divide-border rounded-xl border border-border">
-        {ops.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">No indexed operations yet.</p>
-        ) : null}
-        {ops.map((row) => (
-          <div key={row.id} className="flex flex-wrap justify-between gap-2 px-4 py-3 text-sm">
-            <span>
-              {row.kind} {row.eventName ? `· ${row.eventName}` : ""}{" "}
-              {row.onChain ? <Badge tone="sage">on-chain</Badge> : <Badge>index</Badge>}
-            </span>
-            <span className="font-mono text-xs text-muted">
-              {row.onChain ? (
-                <a
-                  className="text-primary underline"
-                  href={explorerTx(row.ref, explorer)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {row.ref.slice(0, 12)}…
-                </a>
-              ) : (
-                row.ref.slice(0, 18)
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
-    </AppShell>
+        <ChainDialog {...chain} onClose={chain.close} explorerUrl={explorer} />
+      </main>
+    </AdminDarkShell>
   );
 }
