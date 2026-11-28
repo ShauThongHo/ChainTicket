@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Organizer Shows</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Organizer 顶部导航栏 (Shows, Gate, New Show) ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .organizer-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.88);
+    border: 1px solid rgba(251, 191, 36, 0.26);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr { color: rgba(255, 255, 255, 0.82); }
+
+  .role-badge-org {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.38);
+    color: #fde68a;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover { color: #fda4af; }
+
+  /* ================= 3. 主容器 ================= */
+  .organizer-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 112px 32px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* ================= 4. 上方三指标卡片（图1元素） ================= */
+  .metrics-top-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .metric-glass-card {
+    border-radius: 18px;
+    padding: 22px 24px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.94) 0%, rgba(8, 12, 10, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    transition: border-color 0.22s, transform 0.22s;
+  }
+
+  .metric-glass-card:hover {
+    border-color: rgba(110, 231, 183, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .metric-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .metric-kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.56);
+    text-transform: uppercase;
+  }
+
+  .metric-icon-wrap {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .metric-icon-wrap svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .metric-icon-wrap.mint svg  { stroke: #6ee7b7; }
+  .metric-icon-wrap.amber svg { stroke: #fbbf24; }
+  .metric-icon-wrap.cyan svg  { stroke: #38bdf8; }
+
+  .metric-big-val {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(1.65rem, 2.6vw, 2.05rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  /* ================= 5. 下方 Shows 精简列表面板 ================= */
+  .shows-panel-card {
+    border-radius: 22px;
+    padding: 26px 28px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.94) 0%, rgba(8, 12, 10, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  .shows-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .shows-panel-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .shows-count-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .shows-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .show-row-item {
+    padding: 18px 22px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .show-row-item:hover {
+    background: rgba(255, 255, 255, 0.042);
+    border-color: rgba(110, 231, 183, 0.28);
+  }
+
+  .show-row-main-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .show-row-left {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .show-badges-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .s-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .s-badge.active {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(110, 231, 183, 0.42);
+    color: #6ee7b7;
+  }
+
+  .s-badge.ended {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.76);
+  }
+
+  .s-badge.withdrawn {
+    background: rgba(56, 189, 248, 0.16);
+    border: 1px solid rgba(56, 189, 248, 0.36);
+    color: #7dd3fc;
+  }
+
+  .s-badge.window {
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.38);
+    color: #fde68a;
+  }
+
+  .s-badge.disputed {
+    background: rgba(244, 63, 94, 0.18);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+  }
+
+  .s-badge.cancelled {
+    background: rgba(244, 63, 94, 0.18);
+    border: 1px solid rgba(244, 63, 94, 0.42);
+    color: #fda4af;
+  }
+
+  .s-badge.checkin {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.62);
+    font-weight: 500;
+  }
+
+  .show-title-text {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  /* 右侧操作按钮 */
+  .show-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-cancel-refund {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .btn-cancel-refund:hover:not(:disabled) {
+    background: rgba(244, 63, 94, 0.16);
+    border-color: rgba(244, 63, 94, 0.48);
+    color: #fda4af;
+  }
+
+  .btn-cancel-refund:disabled {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.34);
+    cursor: not-allowed;
+  }
+
+  .btn-holder-vote {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-holder-vote:hover:not(:disabled) {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(110, 231, 183, 0.32);
+  }
+
+  .btn-holder-vote:disabled {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.38);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* ================= 图3元素：同一格子内嵌的仲裁证据提交区块 ================= */
+  .arbitration-inline-box {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    cursor: default;
+  }
+
+  .arbitration-hint-text {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .arbitration-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .file-picker-box {
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: rgba(4, 7, 6, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .file-picker-box:hover {
+    border-color: rgba(110, 231, 183, 0.45);
+  }
+
+  .file-picker-box input[type="file"] {
+    display: none;
+  }
+
+  .file-picker-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .file-picker-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.52);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-picker-name.has-file {
+    color: #86efac;
+  }
+
+  .cid-input-box {
+    width: 100%;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 9px;
+    background: rgba(4, 7, 6, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    outline: none;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .cid-input-box::placeholder {
+    color: rgba(255, 255, 255, 0.36);
+  }
+
+  .cid-input-box:focus {
+    border-color: rgba(251, 191, 36, 0.55);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.14);
+  }
+
+  .btn-escalate-admin {
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 9px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.18);
+    color: #fde68a;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s;
+  }
+
+  .btn-escalate-admin:hover:not(:disabled) {
+    background: #fbbf24;
+    color: #040605;
+    transform: translateY(-1px);
+  }
+
+  .btn-escalate-admin:disabled {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.34);
+    cursor: not-allowed;
+  }
+
+  /* ================= 6. 两步链上交易进度确认弹窗 ================= */
+  .tx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(2, 4, 3, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.26s step-end;
+  }
+
+  .tx-modal-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s step-start;
+  }
+
+  .tx-modal-card {
+    position: relative;
+    margin: auto;
+    width: 100%;
+    max-width: 460px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(160deg, rgba(22, 34, 28, 0.96) 0%, rgba(9, 13, 11, 0.99) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: perspective(1200px) scale(0.9);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition:
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open .tx-modal-card {
+    transform: perspective(1200px) scale(1);
+    opacity: 1;
+  }
+
+  .tx-modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 24px;
+    line-height: 1.2;
+  }
+
+  .tx-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .tx-step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .tx-step-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .step-indicator {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinTx 0.8s linear infinite;
+  }
+
+  @keyframes spinTx { to { transform: rotate(360deg); } }
+
+  .step-pending-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .step-done-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.45);
+  }
+
+  .tx-step-text {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .tx-step-text.muted { color: rgba(255, 255, 255, 0.45); }
+
+  .tx-step-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.48);
+    white-space: nowrap;
+  }
+
+  .tx-step-status.active { color: #86efac; }
+  .tx-step-status.done   { color: #6ee7b7; }
+
+  .btn-tx-action {
+    min-width: 124px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-tx-action.ready {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    cursor: pointer;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.3);
+  }
+
+  @media (max-width: 820px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .organizer-shell { padding: 98px 18px 56px; }
+    .metrics-top-grid { grid-template-columns: 1fr; }
+    .shows-panel-card { padding: 20px 18px; }
+    .show-row-main-bar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .show-row-actions {
+      width: 100%;
+    }
+    .btn-cancel-refund,
+    .btn-holder-vote {
+      flex: 1;
+    }
+    .arbitration-controls-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏：Shows, Gate, New Show -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="organizer_shows.html" class="active">Shows</a>
+      <a href="organizer_gate.html">Gate</a>
+      <a href="organizer_new_show.html">New Show</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="organizer-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span id="navBalanceText">0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xb937...d78e</span>
+      <span class="role-badge-org">ORGANIZER</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="organizer-shell">
+  <!-- 上方三指标卡片 -->
+  <section class="metrics-top-grid">
+    <div class="metric-glass-card">
+      <div class="metric-card-top">
+        <span class="metric-kicker">VAULT LOCKED</span>
+        <div class="metric-icon-wrap mint">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+      </div>
+      <div class="metric-big-val" id="metricVaultLocked">75.00 DxDAI</div>
+    </div>
+
+    <div class="metric-glass-card">
+      <div class="metric-card-top">
+        <span class="metric-kicker">ACTIVE SHOWS</span>
+        <div class="metric-icon-wrap amber">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+      </div>
+      <div class="metric-big-val" id="metricActiveShows">2</div>
+    </div>
+
+    <div class="metric-glass-card">
+      <div class="metric-card-top">
+        <span class="metric-kicker">SPENDABLE</span>
+        <div class="metric-icon-wrap cyan">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+            <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+          </svg>
+        </div>
+      </div>
+      <div class="metric-big-val" id="metricSpendable">0.00 DxDAI</div>
+    </div>
+  </section>
+
+  <!-- 下方精简活动列表（Test 2 同一格子内包含图3的仲裁证据提交区块） -->
+  <section class="shows-panel-card">
+    <div class="shows-panel-header">
+      <h2>Shows</h2>
+      <span class="shows-count-meta" id="showsCountMeta">5 of 5 Events</span>
+    </div>
+
+    <div class="shows-rows-list" id="showsRowsList"></div>
+  </section>
+</main>
+
+<!-- 两步链上交易进度确认弹窗 -->
+<div class="tx-modal-backdrop" id="txProgressModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="txModalTitle">
+    <h3 class="tx-modal-title" id="txModalTitle">Confirm transaction</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="step1Text">Confirm transaction in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="step1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="step2Text">Update show state on-chain</span>
+        </div>
+        <span class="tx-step-status" id="step2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="txModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<script>
+  /* ================= 1. Sign out ================= */
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 两步链上交易进度弹窗控制器 ================= */
+  const txProgressModal = document.getElementById("txProgressModal");
+  const txModalTitle = document.getElementById("txModalTitle");
+  const step1Icon = document.getElementById("step1Icon");
+  const step1Text = document.getElementById("step1Text");
+  const step1Status = document.getElementById("step1Status");
+  const step2Icon = document.getElementById("step2Icon");
+  const step2Text = document.getElementById("step2Text");
+  const step2Status = document.getElementById("step2Status");
+  const txModalActionBtn = document.getElementById("txModalActionBtn");
+
+  let txTimers = [];
+
+  function clearTxTimers() {
+    txTimers.forEach(t => clearTimeout(t));
+    txTimers = [];
+  }
+
+  function runTwoStepTxModal({ title, step1Label, step2Label, step2DoneLabel = "Confirmed", onComplete }) {
+    clearTxTimers();
+
+    txModalTitle.textContent = title;
+    step1Text.textContent = step1Label;
+    step2Text.textContent = step2Label;
+
+    step1Icon.innerHTML = `<span class="step-spinner"></span>`;
+    step1Text.classList.remove("muted");
+    step1Status.textContent = "In progress";
+    step1Status.className = "tx-step-status active";
+
+    step2Icon.innerHTML = `<span class="step-pending-dot"></span>`;
+    step2Text.classList.add("muted");
+    step2Status.textContent = "Pending";
+    step2Status.className = "tx-step-status";
+
+    txModalActionBtn.disabled = true;
+    txModalActionBtn.classList.remove("ready");
+    txModalActionBtn.textContent = "Please wait";
+
+    txProgressModal.classList.add("open");
+
+    txTimers.push(setTimeout(() => {
+      step1Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step1Status.textContent = "Confirmed";
+      step1Status.className = "tx-step-status done";
+
+      step2Icon.innerHTML = `<span class="step-spinner"></span>`;
+      step2Text.classList.remove("muted");
+      step2Status.textContent = "In progress";
+      step2Status.className = "tx-step-status active";
+    }, 1100));
+
+    txTimers.push(setTimeout(() => {
+      step2Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step2Status.textContent = step2DoneLabel;
+      step2Status.className = "tx-step-status done";
+
+      txModalActionBtn.disabled = false;
+      txModalActionBtn.classList.add("ready");
+      txModalActionBtn.textContent = "Done";
+
+      if (typeof onComplete === "function") onComplete();
+    }, 2200));
+  }
+
+  function closeTxProgressModal() {
+    clearTxTimers();
+    txProgressModal.classList.remove("open");
+  }
+
+  txModalActionBtn.addEventListener("click", () => {
+    if (!txModalActionBtn.disabled) closeTxProgressModal();
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && txProgressModal.classList.contains("open") && !txModalActionBtn.disabled) {
+      closeTxProgressModal();
+    }
+  });
+
+  /* ================= 3. 活动数据 ================= */
+  const organizerShowsData = [
+    {
+      id: 1,
+      title: "KPOP CONCERT TICKET",
+      status: "active",
+      statusLabel: "Active",
+      subBadge: null,
+      checkinLabel: "0% checked in",
+      vaultAmount: 25.00,
+      canCancel: true,
+      showHolderVoteBtn: true,
+      canOpenVote: false,
+      hasArbitrationBox: false
+    },
+    {
+      id: 2,
+      title: "kuanghuanjie",
+      status: "active",
+      statusLabel: "Active",
+      subBadge: null,
+      checkinLabel: "100% checked in",
+      vaultAmount: 40.00,
+      canCancel: true,
+      showHolderVoteBtn: true,
+      canOpenVote: false,
+      hasArbitrationBox: false
+    },
+    {
+      id: 3,
+      title: "Test Event 3",
+      status: "ended",
+      statusLabel: "Ended",
+      subBadge: null,
+      checkinLabel: "0% checked in",
+      vaultAmount: 10.00,
+      canCancel: false,
+      showHolderVoteBtn: true,
+      canOpenVote: true,
+      hasArbitrationBox: false
+    },
+    {
+      id: 4,
+      title: "Test 2",
+      status: "ended",
+      statusLabel: "Ended",
+      subBadge: { text: "7-Day Objection Window", cls: "window" },
+      checkinLabel: "0% checked in",
+      vaultAmount: 0.00,
+      canCancel: false,
+      showHolderVoteBtn: false,
+      canOpenVote: false,
+      hasArbitrationBox: true,
+      selectedFileName: "",
+      evidenceCid: "",
+      escalated: false
+    },
+    {
+      id: 5,
+      title: "Test Event 1",
+      status: "ended",
+      statusLabel: "Ended",
+      subBadge: { text: "Vault Withdrawn", cls: "withdrawn" },
+      checkinLabel: "0% checked in",
+      vaultAmount: 0.00,
+      canCancel: false,
+      showHolderVoteBtn: false,
+      canOpenVote: false,
+      hasArbitrationBox: false
+    }
+  ];
+
+  const showsRowsList = document.getElementById("showsRowsList");
+  const showsCountMeta = document.getElementById("showsCountMeta");
+  const metricVaultLocked = document.getElementById("metricVaultLocked");
+  const metricActiveShows = document.getElementById("metricActiveShows");
+
+  function updateTopMetrics() {
+    const lockedSum = organizerShowsData.reduce((acc, s) => acc + s.vaultAmount, 0);
+    const activeCount = organizerShowsData.filter(s => s.status === "active").length;
+    metricVaultLocked.textContent = `${lockedSum.toFixed(2)} DxDAI`;
+    metricActiveShows.textContent = String(activeCount);
+  }
+
+  function renderShowsList() {
+    showsCountMeta.textContent = `${organizerShowsData.length} of ${organizerShowsData.length} Events`;
+
+    showsRowsList.innerHTML = organizerShowsData.map(item => {
+      const statusCls =
+        item.status === "active" ? "active" :
+        item.status === "cancelled" ? "cancelled" : "ended";
+
+      const subBadgeHtml = item.subBadge
+        ? `<span class="s-badge ${item.subBadge.cls}">${item.subBadge.text}</span>`
+        : "";
+
+      const holderVoteBtnHtml = item.showHolderVoteBtn
+        ? `<button class="btn-holder-vote" type="button"
+             ${item.canOpenVote ? "" : "disabled"}
+             onclick="event.stopPropagation(); handleOpenHolderVote(${item.id})">
+             Open Holder Vote
+           </button>`
+        : "";
+
+      // 图3元素：直接放在 Test 2 同一个格子的下方
+      const canEscalate = !item.escalated && Boolean(item.selectedFileName || (item.evidenceCid && item.evidenceCid.trim()));
+      const arbitrationHtml = item.hasArbitrationBox
+        ? `
+          <div class="arbitration-inline-box" onclick="event.stopPropagation()">
+            <p class="arbitration-hint-text">
+              Ticket holders may file objections for 7 days. At 1/3 opposition, dispute triggers Admin arbitration.
+            </p>
+            <div class="arbitration-controls-grid">
+              <label class="file-picker-box">
+                <input type="file" onchange="handleEvidenceFileChange(${item.id}, this)">
+                <span class="file-picker-btn">Choose File</span>
+                <span class="file-picker-name ${item.selectedFileName ? 'has-file' : ''}" id="fileLabel-${item.id}">
+                  ${item.selectedFileName || "No file chosen"}
+                </span>
+              </label>
+
+              <input class="cid-input-box" type="text"
+                value="${item.evidenceCid || ""}"
+                placeholder="or paste ipfs://... evidence CID"
+                oninput="handleEvidenceCidInput(${item.id}, this.value)">
+
+              <button class="btn-escalate-admin" id="escalateBtn-${item.id}" type="button"
+                ${canEscalate ? "" : "disabled"}
+                onclick="handleEscalateToAdmin(${item.id})">
+                ${item.escalated ? "Escalated ✓" : "Escalate to Admin"}
+              </button>
+            </div>
+          </div>
+        `
+        : "";
+
+      return `
+        <div class="show-row-item" onclick="window.location.href='organizer_shows_detail.html?id=${item.id}'">
+          <div class="show-row-main-bar">
+            <div class="show-row-left">
+              <div class="show-badges-line">
+                <span class="s-badge ${statusCls}">${item.statusLabel}</span>
+                ${subBadgeHtml}
+                <span class="s-badge checkin">${item.checkinLabel}</span>
+              </div>
+              <div class="show-title-text">${item.title}</div>
+            </div>
+
+            <div class="show-row-actions">
+              <button class="btn-cancel-refund" type="button"
+                ${item.canCancel ? "" : "disabled"}
+                onclick="event.stopPropagation(); handleCancelAndRefund(${item.id})">
+                Cancel &amp; Refund
+              </button>
+              ${holderVoteBtnHtml}
+            </div>
+          </div>
+
+          ${arbitrationHtml}
+        </div>
+      `;
+    }).join("");
+  }
+
+  window.handleEvidenceFileChange = function(showId, inputEl) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item) return;
+    const file = inputEl.files && inputEl.files[0];
+    item.selectedFileName = file ? file.name : "";
+    const labelEl = document.getElementById(`fileLabel-${showId}`);
+    if (labelEl) {
+      labelEl.textContent = item.selectedFileName || "No file chosen";
+      labelEl.classList.toggle("has-file", Boolean(item.selectedFileName));
+    }
+    const btn = document.getElementById(`escalateBtn-${showId}`);
+    if (btn && !item.escalated) {
+      btn.disabled = !(item.selectedFileName || (item.evidenceCid && item.evidenceCid.trim()));
+    }
+  };
+
+  window.handleEvidenceCidInput = function(showId, val) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item) return;
+    item.evidenceCid = val;
+    const btn = document.getElementById(`escalateBtn-${showId}`);
+    if (btn && !item.escalated) {
+      btn.disabled = !(item.selectedFileName || val.trim());
+    }
+  };
+
+  window.handleEscalateToAdmin = function(showId) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item || item.escalated) return;
+
+    runTwoStepTxModal({
+      title: `Escalate to Admin · ${item.title}`,
+      step1Label: "Sign arbitration evidence payload in wallet",
+      step2Label: "Pin evidence CID & freeze vault payout",
+      step2DoneLabel: "Escalated",
+      onComplete: () => {
+        item.escalated = true;
+        item.subBadge = { text: "Admin Arbitration", cls: "disputed" };
+        renderShowsList();
+      }
+    });
+  };
+
+  window.handleCancelAndRefund = function(showId) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item || !item.canCancel) return;
+
+    runTwoStepTxModal({
+      title: `Cancel & Refund · ${item.title}`,
+      step1Label: "Confirm show cancellation in your wallet",
+      step2Label: "Unlock attendee refunds in vault",
+      step2DoneLabel: "Refunds Enabled",
+      onComplete: () => {
+        item.status = "cancelled";
+        item.statusLabel = "Cancelled";
+        item.vaultAmount = 0;
+        item.canCancel = false;
+        item.canOpenVote = false;
+        updateTopMetrics();
+        renderShowsList();
+      }
+    });
+  };
+
+  window.handleOpenHolderVote = function(showId) {
+    const item = organizerShowsData.find(s => s.id === showId);
+    if (!item || !item.canOpenVote) return;
+
+    runTwoStepTxModal({
+      title: `Open Holder Vote · ${item.title}`,
+      step1Label: "Confirm payout proposal in your wallet",
+      step2Label: "Start 7-day objection window on-chain",
+      step2DoneLabel: "Opened",
+      onComplete: () => {
+        item.subBadge = { text: "7-Day Objection Window", cls: "window" };
+        item.showHolderVoteBtn = false;
+        item.canOpenVote = false;
+        item.hasArbitrationBox = true;
+        item.selectedFileName = "";
+        item.evidenceCid = "";
+        item.escalated = false;
+        renderShowsList();
+      }
+    });
+  };
+
+  updateTopMetrics();
+  renderShowsList();
+
+  /* ================= 4. 高性能暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.4,
+    alpha: 0.16 + Math.random() * 0.42,
+    vy: -(0.08 + Math.random() * 0.18),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 18;
+  const RIBBON_SEGS = 64;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = 0.85;
+
+    const hasMouse = smoothMouse.x > -500;
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (hasMouse) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 48400 && distSq > 0.01) {
+            const dist = Math.sqrt(distSq);
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = 0.024 + centerGlow * 0.075;
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+  let lastFrameTime = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    if (txProgressModal.classList.contains("open") && now - lastFrameTime < 50) return;
+    lastFrameTime = now;
+
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    const hasMouse = smoothMouse.x > -500;
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (hasMouse) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 32400 && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a.toFixed(3)})`
+        : `rgba(255, 255, 255, ${(a * 0.8).toFixed(3)})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>

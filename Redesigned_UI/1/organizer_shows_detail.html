@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Show Analytics & Vault</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Organizer 顶部导航栏 ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .organizer-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.88);
+    border: 1px solid rgba(251, 191, 36, 0.26);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr { color: rgba(255, 255, 255, 0.82); }
+
+  .role-badge-org {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.38);
+    color: #fde68a;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover { color: #fda4af; }
+
+  /* ================= 3. 主仪表盘容器 ================= */
+  .detail-dashboard-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 102px 36px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .breadcrumb-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .btn-back-shows {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .btn-back-shows:hover {
+    background: rgba(110, 231, 183, 0.14);
+    border-color: rgba(110, 231, 183, 0.42);
+    color: #86efac;
+  }
+
+  .dashboard-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .left-analytics-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* ================= 4. 顶部 4 格结构（前3格合并为活动信息卡 + 第4格 Vault Balance） ================= */
+  .top-four-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .merged-show-hero-card {
+    grid-column: span 3;
+    border-radius: 20px;
+    padding: 22px 26px;
+    background:
+      radial-gradient(circle at 88% 20%, rgba(52, 211, 153, 0.22) 0%, transparent 56%),
+      linear-gradient(150deg, rgba(18, 34, 27, 0.96) 0%, rgba(8, 13, 11, 0.99) 100%);
+    border: 1px solid rgba(110, 231, 183, 0.34);
+    box-shadow:
+      0 20px 48px rgba(0, 0, 0, 0.72),
+      0 0 36px rgba(52, 211, 153, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .hero-card-top-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .status-badges-wrap {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .status-pill {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .status-pill.active {
+    background: rgba(16, 185, 129, 0.22);
+    border: 1px solid rgba(110, 231, 183, 0.45);
+    color: #6ee7b7;
+  }
+
+  .status-pill.ended {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .status-pill.withdrawn {
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    color: #7dd3fc;
+  }
+
+  .venue-pill-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.72);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .merged-show-title {
+    font-size: clamp(1.55rem, 2.5vw, 2.05rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    line-height: 1.15;
+  }
+
+  .contracts-horizontal-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .contract-chip-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #86efac;
+    text-decoration: none;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .contract-chip-link:hover {
+    background: rgba(110, 231, 183, 0.14);
+    border-color: rgba(110, 231, 183, 0.42);
+  }
+
+  .contract-chip-link span.lbl {
+    color: rgba(255, 255, 255, 0.56);
+  }
+
+  .vault-balance-slot-card {
+    grid-column: span 1;
+    border-radius: 20px;
+    padding: 22px 22px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .vault-slot-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .vault-icon-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(110, 231, 183, 0.12);
+    border: 1px solid rgba(110, 231, 183, 0.32);
+    display: grid;
+    place-items: center;
+    color: #6ee7b7;
+  }
+
+  .vault-icon-circle svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .vault-slot-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.56);
+    text-transform: uppercase;
+  }
+
+  .vault-slot-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+  }
+
+  .vault-slot-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.46);
+    line-height: 1.35;
+  }
+
+  /* ================= 5. 中间部分：卖出价格统计柱状图 ================= */
+  .revenue-chart-card {
+    border-radius: 22px;
+    padding: 24px 28px 22px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .revenue-chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .revenue-chart-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .revenue-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .legend-dot-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot-item i {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .bar-chart-area {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 14px;
+    align-items: stretch;
+    height: 220px;
+  }
+
+  .y-axis-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-bottom: 26px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: right;
+  }
+
+  .bars-plot-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .horizontal-grid-lines {
+    position: absolute;
+    inset: 0 0 26px 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+
+  .horizontal-grid-lines span {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .bars-columns-row {
+    position: relative;
+    z-index: 2;
+    height: 194px;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    align-items: end;
+    gap: 10px;
+    padding: 0 6px;
+  }
+
+  .bar-col-unit {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .bar-capsule-track {
+    width: 100%;
+    max-width: 24px;
+    height: var(--cap-h, 70%);
+    border-radius: 7px 7px 4px 4px;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    transition: transform 0.2s, background-color 0.2s;
+  }
+
+  .bar-col-unit:hover .bar-capsule-track {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.11);
+  }
+
+  .bar-capsule-fill {
+    width: 100%;
+    height: var(--fill-h, 50%);
+    border-radius: 6px 6px 3px 3px;
+    background: linear-gradient(180deg, #6ee7b7 0%, #10b981 100%);
+    box-shadow: 0 0 16px rgba(110, 231, 183, 0.25);
+    transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .bar-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: rgba(8, 14, 11, 0.96);
+    border: 1px solid rgba(110, 231, 183, 0.45);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    color: #86efac;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s;
+    z-index: 10;
+  }
+
+  .bar-col-unit:hover .bar-tooltip {
+    opacity: 1;
+  }
+
+  .x-axis-labels {
+    height: 26px;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 10px;
+    padding: 8px 6px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+  }
+
+  /* ================= 6. 下方 Financial Activity Ledger ================= */
+  .ledger-panel-card {
+    border-radius: 22px;
+    padding: 24px 28px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .ledger-header-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #86efac;
+    margin-bottom: 16px;
+  }
+
+  .ledger-header-row svg {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .ledger-rows-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ledger-tx-row {
+    padding: 15px 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.84rem;
+  }
+
+  .ledger-tx-row:first-child {
+    border-top: none;
+    padding-top: 6px;
+  }
+
+  .ledger-tx-left {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .ledger-tx-left strong {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .ledger-tx-left span {
+    color: rgba(255, 255, 255, 0.56);
+  }
+
+  .ledger-tx-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .tx-hash-link {
+    color: #86efac;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .tx-hash-link:hover {
+    color: #a7f3d0;
+  }
+
+  /* ================= 7. 右侧视觉栏：固定在右侧，左侧滑动时右边不滑动 ================= */
+  .right-visual-col {
+    position: sticky;
+    top: 102px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .show-poster-card {
+    position: relative;
+    width: 100%;
+    height: 224px;
+    border-radius: 22px;
+    padding: 20px 22px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 24px 55px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .show-poster-card[data-theme="crimson"] {
+    background:
+      radial-gradient(circle at 75% 24%, rgba(244, 63, 94, 0.52) 0%, transparent 56%),
+      radial-gradient(circle at 22% 80%, rgba(16, 185, 129, 0.34) 0%, transparent 66%),
+      linear-gradient(155deg, #2b0e18 0%, #060908 100%);
+  }
+
+  .show-poster-card[data-theme="emerald"] {
+    background:
+      radial-gradient(circle at 75% 24%, rgba(52, 211, 153, 0.52) 0%, transparent 56%),
+      radial-gradient(circle at 22% 80%, rgba(6, 78, 59, 0.85) 0%, transparent 66%),
+      linear-gradient(155deg, #0d2e20 0%, #050a08 100%);
+  }
+
+  .show-poster-card[data-theme="cyan"] {
+    background:
+      radial-gradient(circle at 75% 24%, rgba(34, 211, 238, 0.48) 0%, transparent 56%),
+      radial-gradient(circle at 22% 80%, rgba(16, 185, 129, 0.38) 0%, transparent 66%),
+      linear-gradient(155deg, #0b262e 0%, #050908 100%);
+  }
+
+  .show-poster-card[data-theme="amber"] {
+    background:
+      radial-gradient(circle at 75% 24%, rgba(245, 158, 11, 0.48) 0%, transparent 56%),
+      radial-gradient(circle at 22% 80%, rgba(16, 185, 129, 0.32) 0%, transparent 66%),
+      linear-gradient(155deg, #2b1d0b 0%, #060908 100%);
+  }
+
+  .show-poster-card[data-theme="violet"] {
+    background:
+      radial-gradient(circle at 75% 24%, rgba(168, 85, 247, 0.48) 0%, transparent 56%),
+      radial-gradient(circle at 22% 80%, rgba(16, 185, 129, 0.34) 0%, transparent 66%),
+      linear-gradient(155deg, #1e102e 0%, #060908 100%);
+  }
+
+  .poster-halftone {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+    background-size: 6px 6px;
+    mask-image: radial-gradient(circle at 65% 35%, black 16%, transparent 72%);
+    -webkit-mask-image: radial-gradient(circle at 65% 35%, black 16%, transparent 72%);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .poster-top-bar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .poster-brand-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .poster-cat-tag {
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: rgba(110, 231, 183, 0.18);
+    border: 1px solid rgba(110, 231, 183, 0.4);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #86efac;
+  }
+
+  .poster-bottom-info {
+    position: relative;
+    z-index: 2;
+  }
+
+  .poster-event-name {
+    font-size: 1.32rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+    margin-bottom: 4px;
+  }
+
+  .poster-event-sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .rings-progress-card {
+    border-radius: 22px;
+    padding: 24px 20px 24px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .rings-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .rings-card-header h3 {
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .rings-card-header span {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.52);
+  }
+
+  .concentric-ring-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  .concentric-svg {
+    width: 196px;
+    height: 196px;
+    transform: rotate(-90deg);
+    overflow: visible;
+  }
+
+  .ring-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-linecap: round;
+  }
+
+  .ring-progress-outer {
+    fill: none;
+    stroke: #a78bfa;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.45));
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .ring-progress-inner {
+    fill: none;
+    stroke: #6ee7b7;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px rgba(110, 231, 183, 0.45));
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .ring-stats-below {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .ring-legend-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .ring-legend-box {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ring-legend-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  .ring-legend-title i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .ring-legend-pct {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.18rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  /* 水平单行展开，消除折行 */
+  .passes-checkin-line {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.71rem;
+    letter-spacing: -0.02em;
+    color: rgba(255, 255, 255, 0.78);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(110, 231, 183, 0.06);
+    border: 1px solid rgba(110, 231, 183, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .passes-checkin-line strong {
+    color: #86efac;
+  }
+
+  .passes-checkin-sep {
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  @media (max-width: 1120px) {
+    .dashboard-main-grid {
+      grid-template-columns: 1fr;
+    }
+    .right-visual-col {
+      position: static;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 780px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .detail-dashboard-shell { padding: 94px 18px 56px; }
+    .top-four-slots-grid {
+      grid-template-columns: 1fr;
+    }
+    .merged-show-hero-card,
+    .vault-balance-slot-card {
+      grid-column: span 1;
+    }
+    .right-visual-col {
+      grid-template-columns: 1fr;
+    }
+    .bar-chart-area {
+      grid-template-columns: 48px 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏 -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="organizer_shows.html" class="active">Shows</a>
+      <a href="organizer_gate.html">Gate</a>
+      <a href="organizer_new_show.html">New Show</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="organizer-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xb937...d78e</span>
+      <span class="role-badge-org">ORGANIZER</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="detail-dashboard-shell">
+  <!-- 返回 Shows 列表按钮 -->
+  <div class="breadcrumb-bar">
+    <a href="organizer_shows.html" class="btn-back-shows">← Back to Shows</a>
+  </div>
+
+  <div class="dashboard-main-grid">
+    <!-- ================= 左侧主数据区 ================= -->
+    <div class="left-analytics-col">
+      <!-- 顶部 4 格结构：前 3 格合并为活动信息卡 + 第 4 格 Vault Balance -->
+      <section class="top-four-slots-grid">
+        <div class="merged-show-hero-card">
+          <div class="hero-card-top-meta">
+            <div class="status-badges-wrap" id="heroBadgesWrap">
+              <span class="status-pill active">Active</span>
+            </div>
+            <span class="venue-pill-text" id="heroVenueText">📍 WAN XIANG TING</span>
+          </div>
+
+          <h1 class="merged-show-title" id="heroShowTitle">kuanghuanjie</h1>
+
+          <div class="contracts-horizontal-row" id="contractsHorizontalRow"></div>
+        </div>
+
+        <div class="vault-balance-slot-card">
+          <div class="vault-slot-top">
+            <span class="vault-slot-label">Vault Balance</span>
+            <div class="vault-icon-circle">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="vault-slot-value" id="heroVaultBalance">40.00 DxDAI</div>
+          <div class="vault-slot-sub" id="heroVaultUnlockSub">Withdrawals unlock upon event conclusion: 11/29/2026, 3:26:00 PM.</div>
+        </div>
+      </section>
+
+      <!-- 中间部分：卖出价格统计柱状图 -->
+      <section class="revenue-chart-card">
+        <div class="revenue-chart-header">
+          <h2>Ticket Sales Revenue</h2>
+          <div class="revenue-legend-row">
+            <span class="legend-dot-item"><i style="background:#6ee7b7;"></i>Realized Sales (DxDAI)</span>
+            <span class="legend-dot-item"><i style="background:rgba(255,255,255,0.18);"></i>Tier Cap</span>
+          </div>
+        </div>
+
+        <div class="bar-chart-area">
+          <div class="y-axis-labels" id="yAxisLabels">
+            <span>100 DxDAI</span>
+            <span>80 DxDAI</span>
+            <span>60 DxDAI</span>
+            <span>40 DxDAI</span>
+            <span>20 DxDAI</span>
+          </div>
+
+          <div class="bars-plot-wrap">
+            <div class="horizontal-grid-lines">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="bars-columns-row" id="barsColumnsRow"></div>
+            <div class="x-axis-labels" id="xAxisLabels"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 下方 Transaction 部分：Financial Activity Ledger -->
+      <section class="ledger-panel-card">
+        <div class="ledger-header-row">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M12 7v5l4 2"/>
+          </svg>
+          <span id="ledgerHeadingText">Financial Activity Ledger (0)</span>
+        </div>
+
+        <div class="ledger-rows-list" id="ledgerRowsList"></div>
+      </section>
+    </div>
+
+    <!-- ================= 右侧视觉栏：固定在右侧，左侧滑动时右边不滑动 ================= -->
+    <aside class="right-visual-col">
+      <div class="show-poster-card" id="showPosterCard" data-theme="emerald">
+        <div class="poster-halftone"></div>
+        <div class="poster-top-bar">
+          <span class="poster-brand-tag" id="posterPassBadge">CT · EVENT #02</span>
+          <span class="poster-cat-tag" id="posterCatBadge">Festival</span>
+        </div>
+        <div class="poster-bottom-info">
+          <div class="poster-event-name" id="posterEventName">kuanghuanjie</div>
+          <div class="poster-event-sub" id="posterEventSub">📍 WAN XIANG TING · 40.00 DxDAI / Pass</div>
+        </div>
+      </div>
+
+      <div class="rings-progress-card">
+        <div class="rings-card-header">
+          <h3>Pass &amp; Gate Progress</h3>
+          <span id="ringsTotalPasses">Total passes 12</span>
+        </div>
+
+        <div class="concentric-ring-stage">
+          <svg class="concentric-svg" viewBox="0 0 200 200">
+            <!-- 外圈轨道与进度：Gate Check-in -->
+            <circle class="ring-track" cx="100" cy="100" r="80" stroke-width="14"></circle>
+            <circle class="ring-progress-outer" id="outerCheckinRing" cx="100" cy="100" r="80" stroke-width="14"
+              stroke-dasharray="502.65" stroke-dashoffset="502.65"></circle>
+
+            <!-- 内圈轨道与进度：Passes Sold -->
+            <circle class="ring-track" cx="100" cy="100" r="54" stroke-width="14"></circle>
+            <circle class="ring-progress-inner" id="innerSoldRing" cx="100" cy="100" r="54" stroke-width="14"
+              stroke-dasharray="339.29" stroke-dashoffset="339.29"></circle>
+          </svg>
+        </div>
+
+        <div class="ring-stats-below">
+          <div class="ring-legend-grid">
+            <div class="ring-legend-box">
+              <div class="ring-legend-title">
+                <i style="background:#a78bfa;"></i>
+                <span>Gate Check-in</span>
+              </div>
+              <div class="ring-legend-pct" id="outerCheckinPctText">100%</div>
+            </div>
+
+            <div class="ring-legend-box">
+              <div class="ring-legend-title">
+                <i style="background:#6ee7b7;"></i>
+                <span>Passes Sold</span>
+              </div>
+              <div class="ring-legend-pct" id="innerSoldPctText">8%</div>
+            </div>
+          </div>
+
+          <div class="passes-checkin-line" id="passesCheckinSummary">
+            <span>Passes: <strong>1 / 12</strong> sold</span>
+            <span class="passes-checkin-sep">·</span>
+            <span>Gate Checked In: <strong>1 / 1</strong></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<script>
+  /* ================= 1. Sign out ================= */
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 活动完整数据 ================= */
+  const showsDatabase = {
+    1: {
+      id: 1,
+      title: "KPOP CONCERT TICKET",
+      category: "Concert",
+      theme: "crimson",
+      badges: [{ text: "Active", cls: "active" }],
+      venue: "SUC",
+      ticketPrice: "25.00 DxDAI",
+      vaultAddr: "0xdcb5...b229",
+      marketAddr: "0xd044...4dc9",
+      vaultBalance: "25.00 DxDAI",
+      unlockNote: "Withdrawals unlock upon event conclusion: 2/10/2027, 8:59:00 PM.",
+      sold: 1,
+      total: 50,
+      checkedIn: 0,
+      revenueAxisMax: 50,
+      revenueBars: [
+        { label: "Ja", cap: 48, val: 25 },
+        { label: "Fb", cap: 76, val: 50 },
+        { label: "Mr", cap: 60, val: 25 },
+        { label: "Ap", cap: 72, val: 50 },
+        { label: "My", cap: 88, val: 45 },
+        { label: "Jn", cap: 74, val: 62 },
+        { label: "Jl", cap: 56, val: 38 },
+        { label: "Au", cap: 52, val: 25 },
+        { label: "Sp", cap: 68, val: 50 },
+        { label: "Oc", cap: 58, val: 35 },
+        { label: "Nv", cap: 74, val: 52 },
+        { label: "Dc", cap: 82, val: 36 }
+      ],
+      ledger: [
+        { type: "buy_primary", time: "11/24/2026, 3:05:38 PM", amount: "25.00 DxDAI", tx: "tx 0xfa7f6bad..." },
+        { type: "mint", time: "11/24/2026, 3:03:32 PM", amount: "0.00 DxDAI", tx: "tx 0x4757cf62..." }
+      ]
+    },
+    2: {
+      id: 2,
+      title: "kuanghuanjie",
+      category: "Festival",
+      theme: "emerald",
+      badges: [{ text: "Active", cls: "active" }],
+      venue: "WAN XIANG TING",
+      ticketPrice: "40.00 DxDAI",
+      vaultAddr: "0xf1ee...36bb",
+      marketAddr: "0x8112...9a2c",
+      vaultBalance: "40.00 DxDAI",
+      unlockNote: "Withdrawals unlock upon event conclusion: 11/29/2026, 3:26:00 PM.",
+      sold: 1,
+      total: 12,
+      checkedIn: 1,
+      revenueAxisMax: 100,
+      revenueBars: [
+        { label: "Ja", cap: 45, val: 20 },
+        { label: "Fb", cap: 65, val: 40 },
+        { label: "Mr", cap: 55, val: 30 },
+        { label: "Ap", cap: 80, val: 55 },
+        { label: "My", cap: 92, val: 48 },
+        { label: "Jn", cap: 78, val: 65 },
+        { label: "Jl", cap: 60, val: 40 },
+        { label: "Au", cap: 50, val: 32 },
+        { label: "Sp", cap: 70, val: 48 },
+        { label: "Oc", cap: 62, val: 40 },
+        { label: "Nv", cap: 84, val: 60 },
+        { label: "Dc", cap: 88, val: 40 }
+      ],
+      ledger: []
+    },
+    3: {
+      id: 3,
+      title: "Test Event 3",
+      category: "Club",
+      theme: "cyan",
+      badges: [{ text: "Ended", cls: "ended" }],
+      venue: "115C",
+      ticketPrice: "10.00 DxDAI",
+      vaultAddr: "0x03bc...2375",
+      marketAddr: "0x3895...6f1e",
+      vaultBalance: "10.00 DxDAI",
+      unlockNote: "Event concluded · Ready to open 7-day holder payout vote.",
+      sold: 1,
+      total: 12,
+      checkedIn: 0,
+      revenueAxisMax: 25,
+      revenueBars: [
+        { label: "Ja", cap: 42, val: 20 },
+        { label: "Fb", cap: 68, val: 40 },
+        { label: "Mr", cap: 54, val: 24 },
+        { label: "Ap", cap: 70, val: 48 },
+        { label: "My", cap: 86, val: 40 },
+        { label: "Jn", cap: 72, val: 58 },
+        { label: "Jl", cap: 52, val: 32 },
+        { label: "Au", cap: 48, val: 26 },
+        { label: "Sp", cap: 64, val: 42 },
+        { label: "Oc", cap: 56, val: 30 },
+        { label: "Nv", cap: 76, val: 46 },
+        { label: "Dc", cap: 80, val: 34 }
+      ],
+      ledger: [
+        { type: "buy_primary", time: "11/24/2026, 2:27:03 PM", amount: "10.00 DxDAI", tx: "tx 0x4bdc4d43..." },
+        { type: "mint", time: "11/24/2026, 1:28:06 PM", amount: "0.00 DxDAI", tx: "tx 0x726a95b4..." }
+      ]
+    },
+    4: {
+      id: 4,
+      title: "Test 2",
+      category: "Concert",
+      theme: "amber",
+      badges: [
+        { text: "Ended", cls: "ended" },
+        { text: "7-Day Objection Window", cls: "withdrawn" }
+      ],
+      venue: "115",
+      ticketPrice: "11.00 DxDAI",
+      vaultAddr: "0x10f3...8833",
+      marketAddr: "0xe687...c9b8",
+      vaultBalance: "0.00 DxDAI",
+      unlockNote: "Window Deadline: 12/2/2026, 9:35:35 AM",
+      sold: 0,
+      total: 12,
+      checkedIn: 0,
+      revenueAxisMax: 25,
+      revenueBars: [
+        { label: "Ja", cap: 40, val: 0 },
+        { label: "Fb", cap: 55, val: 0 },
+        { label: "Mr", cap: 48, val: 0 },
+        { label: "Ap", cap: 62, val: 0 },
+        { label: "My", cap: 75, val: 0 },
+        { label: "Jn", cap: 64, val: 0 },
+        { label: "Jl", cap: 50, val: 0 },
+        { label: "Au", cap: 45, val: 0 },
+        { label: "Sp", cap: 58, val: 0 },
+        { label: "Oc", cap: 52, val: 0 },
+        { label: "Nv", cap: 66, val: 0 },
+        { label: "Dc", cap: 70, val: 0 }
+      ],
+      ledger: []
+    },
+    5: {
+      id: 5,
+      title: "Test Event 1",
+      category: "Concert",
+      theme: "violet",
+      badges: [
+        { text: "Ended", cls: "ended" },
+        { text: "Vault Withdrawn", cls: "withdrawn" }
+      ],
+      venue: "115C",
+      ticketPrice: "10.00 DxDAI",
+      vaultAddr: "0x396b...bab7",
+      marketAddr: "0x5113...1dc1",
+      vaultBalance: "0.00 DxDAI",
+      unlockNote: "Vault payout settled and withdrawn to organizer wallet.",
+      sold: 1,
+      total: 12,
+      checkedIn: 0,
+      revenueAxisMax: 25,
+      revenueBars: [
+        { label: "Ja", cap: 44, val: 22 },
+        { label: "Fb", cap: 66, val: 42 },
+        { label: "Mr", cap: 52, val: 28 },
+        { label: "Ap", cap: 72, val: 50 },
+        { label: "My", cap: 84, val: 42 },
+        { label: "Jn", cap: 70, val: 56 },
+        { label: "Jl", cap: 54, val: 34 },
+        { label: "Au", cap: 48, val: 28 },
+        { label: "Sp", cap: 66, val: 44 },
+        { label: "Oc", cap: 56, val: 32 },
+        { label: "Nv", cap: 74, val: 48 },
+        { label: "Dc", cap: 78, val: 36 }
+      ],
+      ledger: [
+        { type: "withdraw", time: "11/26/2026, 1:53:44 PM", amount: "10.00 DxDAI", tx: "tx 0xbc78309a..." },
+        { type: "unfreeze", time: "11/13/2026, 2:02:04 PM", amount: "0.00 DxDAI", tx: "tx 0xf8011b60..." },
+        { type: "freeze", time: "11/13/2026, 1:53:22 PM", amount: "0.00 DxDAI", tx: "tx 0x6f03817e..." },
+        { type: "buy_primary", time: "11/10/2026, 5:42:03 PM", amount: "10.00 DxDAI", tx: "tx 0x40fee3b2..." },
+        { type: "mint", time: "11/10/2026, 5:31:59 PM", amount: "0.00 DxDAI", tx: "tx 0xfc5a9145..." }
+      ]
+    }
+  };
+
+  /* ================= 3. 读取 URL ?id= 参数并渲染整页数据 ================= */
+  const params = new URLSearchParams(window.location.search);
+  const showId = Number(params.get("id")) || 2;
+  const currentShow = showsDatabase[showId] || showsDatabase[2];
+
+  document.getElementById("heroBadgesWrap").innerHTML = currentShow.badges
+    .map(b => `<span class="status-pill ${b.cls}">${b.text}</span>`)
+    .join("");
+
+  document.getElementById("heroVenueText").textContent = `📍 ${currentShow.venue}`;
+  document.getElementById("heroShowTitle").textContent = currentShow.title;
+
+  document.getElementById("contractsHorizontalRow").innerHTML = `
+    <a class="contract-chip-link" onclick="navigator.clipboard?.writeText('${currentShow.vaultAddr}'); this.title='Copied!'">
+      <span class="lbl">Vault</span>
+      <strong>${currentShow.vaultAddr} ↗</strong>
+    </a>
+    <a class="contract-chip-link" onclick="navigator.clipboard?.writeText('${currentShow.marketAddr}'); this.title='Copied!'">
+      <span class="lbl">Market</span>
+      <strong>${currentShow.marketAddr} ↗</strong>
+    </a>
+  `;
+
+  document.getElementById("heroVaultBalance").textContent = currentShow.vaultBalance;
+  document.getElementById("heroVaultUnlockSub").textContent = currentShow.unlockNote;
+
+  const showPosterCard = document.getElementById("showPosterCard");
+  showPosterCard.dataset.theme = currentShow.theme;
+  document.getElementById("posterPassBadge").textContent = `CT · EVENT #0${currentShow.id}`;
+  document.getElementById("posterCatBadge").textContent = currentShow.category;
+  document.getElementById("posterEventName").textContent = currentShow.title;
+  document.getElementById("posterEventSub").textContent = `📍 ${currentShow.venue} · ${currentShow.ticketPrice}`;
+
+  const soldPct = currentShow.total > 0 ? Math.round((currentShow.sold / currentShow.total) * 100) : 0;
+  const checkinPct = currentShow.sold > 0 ? Math.round((currentShow.checkedIn / currentShow.sold) * 100) : 0;
+
+  document.getElementById("ringsTotalPasses").textContent = `Total passes ${currentShow.total}`;
+  document.getElementById("outerCheckinPctText").textContent = `${checkinPct}%`;
+  document.getElementById("innerSoldPctText").textContent = `${soldPct}%`;
+  document.getElementById("passesCheckinSummary").innerHTML =
+    `<span>Passes: <strong>${currentShow.sold} / ${currentShow.total}</strong> sold</span>` +
+    `<span class="passes-checkin-sep">·</span>` +
+    `<span>Gate Checked In: <strong>${currentShow.checkedIn} / ${currentShow.sold}</strong></span>`;
+
+  const OUTER_CIRC = 2 * Math.PI * 80;
+  const INNER_CIRC = 2 * Math.PI * 54;
+
+  requestAnimationFrame(() => {
+    const outerOffset = OUTER_CIRC * (1 - checkinPct / 100);
+    const innerOffset = INNER_CIRC * (1 - soldPct / 100);
+    document.getElementById("outerCheckinRing").style.strokeDashoffset = outerOffset.toFixed(2);
+    document.getElementById("innerSoldRing").style.strokeDashoffset = innerOffset.toFixed(2);
+  });
+
+  const maxY = currentShow.revenueAxisMax;
+  document.getElementById("yAxisLabels").innerHTML = [1, 0.8, 0.6, 0.4, 0.2]
+    .map(ratio => `<span>${Math.round(maxY * ratio)} DxDAI</span>`)
+    .join("");
+
+  document.getElementById("barsColumnsRow").innerHTML = currentShow.revenueBars.map(b => {
+    const estDxDai = ((b.cap / 100) * (b.val / 100) * maxY).toFixed(2);
+    return `
+      <div class="bar-col-unit">
+        <div class="bar-tooltip">${b.label}: ${estDxDai} DxDAI</div>
+        <div class="bar-capsule-track" style="--cap-h: ${b.cap}%;">
+          <div class="bar-capsule-fill" style="--fill-h: ${b.val}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("xAxisLabels").innerHTML = currentShow.revenueBars
+    .map(b => `<span>${b.label}</span>`)
+    .join("");
+
+  document.getElementById("ledgerHeadingText").textContent =
+    `Financial Activity Ledger (${currentShow.ledger.length})`;
+
+  const ledgerRowsList = document.getElementById("ledgerRowsList");
+  if (currentShow.ledger.length === 0) {
+    ledgerRowsList.innerHTML = `
+      <div style="padding:14px 4px;font-family:monospace;font-size:0.8rem;color:rgba(255,255,255,0.45);">
+        No financial ledger entries recorded for this show yet.
+      </div>
+    `;
+  } else {
+    ledgerRowsList.innerHTML = currentShow.ledger.map(tx => `
+      <div class="ledger-tx-row">
+        <div class="ledger-tx-left">
+          <strong>${tx.type}</strong> <span>· ${tx.time}</span>
+        </div>
+        <div class="ledger-tx-right">
+          <span>${tx.amount} ·</span>
+          <a class="tx-hash-link" onclick="navigator.clipboard?.writeText('${tx.tx}')">${tx.tx}</a>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  /* ================= 4. 高性能暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.4,
+    alpha: 0.16 + Math.random() * 0.42,
+    vy: -(0.08 + Math.random() * 0.18),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 18;
+  const RIBBON_SEGS = 64;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = 0.85;
+
+    const hasMouse = smoothMouse.x > -500;
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (hasMouse) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 48400 && distSq > 0.01) {
+            const dist = Math.sqrt(distSq);
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = 0.024 + centerGlow * 0.075;
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    const hasMouse = smoothMouse.x > -500;
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (hasMouse) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 32400 && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a.toFixed(3)})`
+        : `rgba(255, 255, 255, ${(a * 0.8).toFixed(3)})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>

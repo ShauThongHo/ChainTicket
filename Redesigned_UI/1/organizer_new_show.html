@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainTicket — Create an Event</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #040605;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #040605; }
+  ::-webkit-scrollbar-thumb { background: rgba(110, 231, 183, 0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, 0.45); }
+
+  /* ================= 1. 统一暗黑翡翠拓扑星尘背景 ================= */
+  .bg-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 65% 48% at 50% -2%, rgba(68, 185, 114, 0.24) 0%, rgba(18, 52, 33, 0.08) 52%, transparent 82%),
+      radial-gradient(circle at 75% 55%, rgba(45, 150, 95, 0.1) 0%, transparent 50%),
+      #040605;
+  }
+
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 110px, 160px 100%;
+    mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 48%, black 30%, transparent 88%);
+    pointer-events: none;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ================= 2. Organizer 顶部导航栏 (Shows, Gate, New Show) ================= */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(4, 6, 5, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #6ee7b7 0%, #10b981 100%);
+    color: #040605;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    box-shadow: 0 0 18px rgba(110, 231, 183, 0.35);
+  }
+
+  .nav-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .nav-pills a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.82rem;
+    padding: 6px 15px;
+    border-radius: 7px;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .nav-pills a.active {
+    background: rgba(110, 231, 183, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(110, 231, 183, 0.22);
+    font-weight: 600;
+  }
+
+  .nav-pills a:hover:not(.active) {
+    color: #ffffff;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .network-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    box-shadow: 0 0 8px #6ee7b7;
+  }
+
+  .organizer-wallet-pill {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: rgba(14, 22, 18, 0.88);
+    border: 1px solid rgba(251, 191, 36, 0.26);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  .wallet-balance-grp {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .wallet-balance-grp svg {
+    width: 15px;
+    height: 15px;
+    stroke: #86efac;
+    stroke-width: 1.9;
+    fill: none;
+  }
+
+  .pill-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .wallet-addr { color: rgba(255, 255, 255, 0.82); }
+
+  .role-badge-org {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.38);
+    color: #fde68a;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-sign-out {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.56);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.2s;
+  }
+
+  .btn-sign-out:hover { color: #fda4af; }
+
+  /* ================= 3. Create an event 主容器 ================= */
+  .create-event-shell {
+    position: relative;
+    z-index: 10;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 112px 32px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+
+  .create-hero-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .create-hero-header h1 {
+    font-size: clamp(2.1rem, 3.6vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    line-height: 1.1;
+  }
+
+  .create-hero-header p {
+    font-size: 0.96rem;
+    color: rgba(255, 255, 255, 0.56);
+    line-height: 1.5;
+  }
+
+  /* ================= 4. 表单主体卡片 ================= */
+  .create-form-card {
+    border-radius: 24px;
+    padding: 32px 34px;
+    background: linear-gradient(155deg, rgba(16, 26, 22, 0.95) 0%, rgba(8, 12, 10, 0.99) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 26px 65px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .f-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .f-label-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .f-label {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .help-tip-icon {
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    cursor: help;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .help-tip-icon:hover {
+    border-color: #86efac;
+    color: #86efac;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .f-input,
+  .f-select {
+    width: 100%;
+    height: 46px;
+    padding: 0 15px;
+    border-radius: 11px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.88rem;
+    outline: none;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .f-input::placeholder {
+    color: rgba(255, 255, 255, 0.34);
+  }
+
+  .f-input:focus,
+  .f-select:focus,
+  .f-textarea:focus {
+    border-color: rgba(110, 231, 183, 0.52);
+    box-shadow: 0 0 16px rgba(110, 231, 183, 0.14);
+  }
+
+  /* 自定义下拉箭头位置，拉开箭头与右边框的距离 */
+  .f-select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 0 44px 0 15px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 15px 15px;
+  }
+
+  .f-select option {
+    background: #0c1410;
+    color: #ffffff;
+  }
+
+  input[type="datetime-local"].f-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.84rem;
+    color-scheme: dark;
+  }
+
+  /* 海报上传栏 */
+  .poster-file-box {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .poster-file-box:hover {
+    border-color: rgba(110, 231, 183, 0.45);
+  }
+
+  .poster-file-box input[type="file"] {
+    display: none;
+  }
+
+  .btn-choose-file {
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .poster-file-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.52);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .poster-file-status.selected {
+    color: #86efac;
+  }
+
+  .f-sub-hint {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.48);
+  }
+
+  .poster-preview-strip {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(110, 231, 183, 0.06);
+    border: 1px solid rgba(110, 231, 183, 0.24);
+  }
+
+  .poster-preview-strip.show {
+    display: flex;
+  }
+
+  .poster-preview-strip img {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .poster-preview-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem;
+    color: #86efac;
+  }
+
+  /* Description 文本框 */
+  .f-textarea {
+    width: 100%;
+    min-height: 112px;
+    padding: 12px 15px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    resize: vertical;
+    outline: none;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .f-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.34);
+  }
+
+  /* ================= 5. Ticket types & Add tier 区块 ================= */
+  .ticket-types-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ticket-types-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .btn-add-tier {
+    height: 36px;
+    padding: 0 15px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .btn-add-tier:hover {
+    background: rgba(110, 231, 183, 0.16);
+    border-color: rgba(110, 231, 183, 0.48);
+    color: #86efac;
+  }
+
+  .tiers-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tier-row-card {
+    padding: 12px;
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 1fr auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tier-row-card.single-tier {
+    grid-template-columns: 1.25fr 1fr 1fr;
+  }
+
+  .tier-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .tier-input-wrap .f-input {
+    height: 44px;
+    font-size: 0.86rem;
+  }
+
+  .tier-input-wrap.mono .f-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .tier-unit-suffix {
+    position: absolute;
+    right: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.45);
+    pointer-events: none;
+  }
+
+  .btn-remove-tier {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(244, 63, 94, 0.12);
+    border: 1px solid rgba(244, 63, 94, 0.32);
+    color: #fda4af;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .btn-remove-tier:hover {
+    background: rgba(244, 63, 94, 0.26);
+    color: #ffffff;
+  }
+
+  .btn-create-event {
+    width: 100%;
+    height: 48px;
+    margin-top: 6px;
+    border-radius: 11px;
+    border: none;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 0 26px rgba(110, 231, 183, 0.25);
+    transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-create-event:hover:not(:disabled) {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+    box-shadow: 0 0 36px rgba(110, 231, 183, 0.42);
+  }
+
+  .btn-create-event:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.38);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* ================= 6. 两步链上交易进度确认弹窗 ================= */
+  .tx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(2, 4, 3, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.26s step-end;
+  }
+
+  .tx-modal-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s step-start;
+  }
+
+  .tx-modal-card {
+    position: relative;
+    margin: auto;
+    width: 100%;
+    max-width: 460px;
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: linear-gradient(160deg, rgba(22, 34, 28, 0.96) 0%, rgba(9, 13, 11, 0.99) 100%);
+    border: 1px solid rgba(134, 239, 172, 0.28);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: perspective(1200px) scale(0.9);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition:
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tx-modal-backdrop.open .tx-modal-card {
+    transform: perspective(1200px) scale(1);
+    opacity: 1;
+  }
+
+  .tx-modal-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    margin-bottom: 24px;
+    line-height: 1.2;
+  }
+
+  .tx-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .tx-step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .tx-step-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .step-indicator {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-spinner {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.2px solid rgba(110, 231, 183, 0.2);
+    border-top-color: #6ee7b7;
+    border-right-color: #6ee7b7;
+    animation: spinTx 0.8s linear infinite;
+  }
+
+  @keyframes spinTx { to { transform: rotate(360deg); } }
+
+  .step-pending-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .step-done-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6ee7b7;
+    color: #040605;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 14px rgba(110, 231, 183, 0.45);
+  }
+
+  .tx-step-text {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .tx-step-text.muted { color: rgba(255, 255, 255, 0.45); }
+
+  .tx-step-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.48);
+    white-space: nowrap;
+  }
+
+  .tx-step-status.active { color: #86efac; }
+  .tx-step-status.done   { color: #6ee7b7; }
+
+  .btn-tx-action {
+    min-width: 124px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-tx-action.ready {
+    background: #6ee7b7;
+    border-color: #6ee7b7;
+    color: #040605;
+    cursor: pointer;
+    box-shadow: 0 0 24px rgba(110, 231, 183, 0.3);
+  }
+
+  @media (max-width: 780px) {
+    .navbar { padding: 0 20px; }
+    .nav-pills, .network-chip { display: none; }
+    .create-event-shell { padding: 98px 18px 60px; }
+    .create-form-card { padding: 24px 18px; }
+    .form-grid-2 { grid-template-columns: 1fr; }
+    .tier-row-card,
+    .tier-row-card.single-tier {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-stage"></div>
+<div class="grid-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- 顶部导航栏：Shows, Gate, New Show -->
+<header class="navbar">
+  <div class="nav-left">
+    <a href="homepage.html" class="brand">
+      <div class="brand-logo">CT</div>
+      ChainTicket
+    </a>
+    <nav class="nav-pills">
+      <a href="organizer_shows.html">Shows</a>
+      <a href="organizer_gate.html">Gate</a>
+      <a href="organizer_new_show.html" class="active">New Show</a>
+    </nav>
+  </div>
+
+  <div class="nav-right">
+    <div class="network-chip">
+      <span class="status-dot"></span>
+      Mainnet Live
+    </div>
+
+    <div class="organizer-wallet-pill">
+      <div class="wallet-balance-grp">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+        </svg>
+        <span>0.00 DxDAI</span>
+      </div>
+      <span class="pill-divider"></span>
+      <span class="wallet-addr">0xb937...d78e</span>
+      <span class="role-badge-org">ORGANIZER</span>
+      <button class="btn-sign-out" id="signOutBtn" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="create-event-shell">
+  <section class="create-hero-header">
+    <h1>Create an event</h1>
+    <p>Add the show and the tickets you want to sell.</p>
+  </section>
+
+  <form class="create-form-card" id="createEventForm" novalidate>
+    <div class="f-group">
+      <label class="f-label" for="showNameInput">Show name</label>
+      <input class="f-input" id="showNameInput" type="text" placeholder="e.g. Nebula Synth Live" required>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="f-group">
+        <label class="f-label" for="venueInput">Venue</label>
+        <input class="f-input" id="venueInput" type="text" placeholder="e.g. Arena 04 · Tokyo" required>
+      </div>
+
+      <div class="f-group">
+        <label class="f-label" for="categorySelect">Category</label>
+        <select class="f-select" id="categorySelect">
+          <option value="Concert" selected>Concert</option>
+          <option value="Festival">Festival</option>
+          <option value="Club">Club</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="f-group">
+      <div class="f-label-row">
+        <label class="f-label">Poster</label>
+        <span class="help-tip-icon" title="Recommended 16:9 or 4:3 cover image. Uploaded files are pinned to IPFS automatically.">?</span>
+      </div>
+
+      <label class="poster-file-box">
+        <input type="file" id="posterFileInput" accept="image/*">
+        <span class="btn-choose-file">Choose File</span>
+        <span class="poster-file-status" id="posterFileStatus">No file chosen</span>
+      </label>
+
+      <span class="f-sub-hint">Choose an image or paste a poster link.</span>
+
+      <input class="f-input" id="posterUrlInput" type="url" placeholder="https://... (optional if you already uploaded)">
+
+      <div class="poster-preview-strip" id="posterPreviewStrip">
+        <img id="posterPreviewImg" src="" alt="Poster Preview">
+        <span class="poster-preview-meta" id="posterPreviewMeta">Poster asset attached</span>
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="f-group">
+        <label class="f-label" for="startsAtInput">Starts</label>
+        <input class="f-input" id="startsAtInput" type="datetime-local" value="2026-11-27T19:46" required>
+      </div>
+
+      <div class="f-group">
+        <label class="f-label" for="endsAtInput">Ends</label>
+        <input class="f-input" id="endsAtInput" type="datetime-local" value="2026-11-28T00:16" required>
+      </div>
+    </div>
+
+    <div class="f-group">
+      <label class="f-label" for="descriptionInput">Description</label>
+      <textarea class="f-textarea" id="descriptionInput" placeholder="Describe your show, doors open schedule, and admission notes..."></textarea>
+    </div>
+
+    <div class="ticket-types-section">
+      <div class="ticket-types-header">
+        <label class="f-label">Ticket types</label>
+        <button class="btn-add-tier" id="addTierBtn" type="button">Add tier</button>
+      </div>
+
+      <div class="tiers-container" id="tiersContainer"></div>
+    </div>
+
+    <button class="btn-create-event" id="createEventSubmitBtn" type="submit">
+      Create event
+    </button>
+  </form>
+</main>
+
+<!-- 两步链上部署交易进度弹窗 -->
+<div class="tx-modal-backdrop" id="txProgressModal">
+  <div class="tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="txModalTitle">
+    <h3 class="tx-modal-title" id="txModalTitle">Deploy show contract</h3>
+
+    <div class="tx-steps-list">
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step1Icon">
+            <span class="step-spinner"></span>
+          </div>
+          <span class="tx-step-text" id="step1Text">Confirm deployment in your wallet</span>
+        </div>
+        <span class="tx-step-status active" id="step1Status">In progress</span>
+      </div>
+
+      <div class="tx-step-row">
+        <div class="tx-step-left">
+          <div class="step-indicator" id="step2Icon">
+            <span class="step-pending-dot"></span>
+          </div>
+          <span class="tx-step-text muted" id="step2Text">Initialize Vault &amp; Market on-chain</span>
+        </div>
+        <span class="tx-step-status" id="step2Status">Pending</span>
+      </div>
+    </div>
+
+    <button class="btn-tx-action" id="txModalActionBtn" type="button" disabled>Please wait</button>
+  </div>
+</div>
+
+<script>
+  /* ================= 1. Sign out ================= */
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    window.location.href = "homepage.html";
+  });
+
+  /* ================= 2. 海报图片上传与预览 ================= */
+  const posterFileInput = document.getElementById("posterFileInput");
+  const posterFileStatus = document.getElementById("posterFileStatus");
+  const posterUrlInput = document.getElementById("posterUrlInput");
+  const posterPreviewStrip = document.getElementById("posterPreviewStrip");
+  const posterPreviewImg = document.getElementById("posterPreviewImg");
+  const posterPreviewMeta = document.getElementById("posterPreviewMeta");
+
+  posterFileInput.addEventListener("change", () => {
+    const file = posterFileInput.files && posterFileInput.files[0];
+    if (!file) {
+      posterFileStatus.textContent = "No file chosen";
+      posterFileStatus.classList.remove("selected");
+      if (!posterUrlInput.value.trim()) posterPreviewStrip.classList.remove("show");
+      return;
+    }
+    posterFileStatus.textContent = file.name;
+    posterFileStatus.classList.add("selected");
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      posterPreviewImg.src = e.target.result;
+      posterPreviewMeta.textContent = `${file.name} · Ready for IPFS upload`;
+      posterPreviewStrip.classList.add("show");
+    };
+    reader.readAsDataURL(file);
+  });
+
+  posterUrlInput.addEventListener("input", () => {
+    const url = posterUrlInput.value.trim();
+    if (url && !(posterFileInput.files && posterFileInput.files[0])) {
+      posterPreviewImg.src = url;
+      posterPreviewMeta.textContent = "External poster URL linked";
+      posterPreviewStrip.classList.add("show");
+    } else if (!url && !(posterFileInput.files && posterFileInput.files[0])) {
+      posterPreviewStrip.classList.remove("show");
+    }
+  });
+
+  /* ================= 3. 动态票档管理 (Ticket types + Add tier) ================= */
+  const tiersContainer = document.getElementById("tiersContainer");
+  const addTierBtn = document.getElementById("addTierBtn");
+
+  let ticketTiers = [
+    { name: "General Admission", price: "40.00", supply: "12" }
+  ];
+
+  function renderTicketTiers() {
+    const isSingle = ticketTiers.length === 1;
+    tiersContainer.innerHTML = ticketTiers.map((tier, idx) => `
+      <div class="tier-row-card ${isSingle ? 'single-tier' : ''}">
+        <div class="tier-input-wrap">
+          <input class="f-input" type="text" value="${tier.name}" placeholder="Tier name"
+            oninput="updateTierField(${idx}, 'name', this.value)">
+        </div>
+
+        <div class="tier-input-wrap mono">
+          <input class="f-input" type="number" step="0.01" min="0" value="${tier.price}" placeholder="0.00"
+            oninput="updateTierField(${idx}, 'price', this.value)">
+          <span class="tier-unit-suffix">DxDAI</span>
+        </div>
+
+        <div class="tier-input-wrap mono">
+          <input class="f-input" type="number" step="1" min="1" value="${tier.supply}" placeholder="Qty"
+            oninput="updateTierField(${idx}, 'supply', this.value)">
+          <span class="tier-unit-suffix">passes</span>
+        </div>
+
+        ${isSingle ? "" : `
+          <button class="btn-remove-tier" type="button" title="Remove tier" onclick="removeTierRow(${idx})">✕</button>
+        `}
+      </div>
+    `).join("");
+  }
+
+  window.updateTierField = function(idx, field, val) {
+    if (ticketTiers[idx]) ticketTiers[idx][field] = val;
+  };
+
+  window.removeTierRow = function(idx) {
+    if (ticketTiers.length <= 1) return;
+    ticketTiers.splice(idx, 1);
+    renderTicketTiers();
+  };
+
+  addTierBtn.addEventListener("click", () => {
+    ticketTiers.push({
+      name: ticketTiers.length === 1 ? "VIP Pass" : `Tier #${ticketTiers.length + 1}`,
+      price: "80.00",
+      supply: "10"
+    });
+    renderTicketTiers();
+  });
+
+  renderTicketTiers();
+
+  /* ================= 4. 两步链上部署交易进度弹窗 & 表单提交 ================= */
+  const txProgressModal = document.getElementById("txProgressModal");
+  const txModalTitle = document.getElementById("txModalTitle");
+  const step1Icon = document.getElementById("step1Icon");
+  const step1Text = document.getElementById("step1Text");
+  const step1Status = document.getElementById("step1Status");
+  const step2Icon = document.getElementById("step2Icon");
+  const step2Text = document.getElementById("step2Text");
+  const step2Status = document.getElementById("step2Status");
+  const txModalActionBtn = document.getElementById("txModalActionBtn");
+
+  let txTimers = [];
+  let createdSuccess = false;
+
+  function clearTxTimers() {
+    txTimers.forEach(t => clearTimeout(t));
+    txTimers = [];
+  }
+
+  function runCreateEventTx(showName) {
+    clearTxTimers();
+    createdSuccess = false;
+
+    txModalTitle.textContent = `Create "${showName}"`;
+    step1Text.textContent = "Confirm deployment in your wallet";
+    step2Text.textContent = "Initialize Vault & Market on-chain";
+
+    step1Icon.innerHTML = `<span class="step-spinner"></span>`;
+    step1Text.classList.remove("muted");
+    step1Status.textContent = "In progress";
+    step1Status.className = "tx-step-status active";
+
+    step2Icon.innerHTML = `<span class="step-pending-dot"></span>`;
+    step2Text.classList.add("muted");
+    step2Status.textContent = "Pending";
+    step2Status.className = "tx-step-status";
+
+    txModalActionBtn.disabled = true;
+    txModalActionBtn.classList.remove("ready");
+    txModalActionBtn.textContent = "Please wait";
+
+    txProgressModal.classList.add("open");
+
+    txTimers.push(setTimeout(() => {
+      step1Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step1Status.textContent = "Confirmed";
+      step1Status.className = "tx-step-status done";
+
+      step2Icon.innerHTML = `<span class="step-spinner"></span>`;
+      step2Text.classList.remove("muted");
+      step2Status.textContent = "In progress";
+      step2Status.className = "tx-step-status active";
+    }, 1100));
+
+    txTimers.push(setTimeout(() => {
+      step2Icon.innerHTML = `<span class="step-done-check">✓</span>`;
+      step2Status.textContent = "Deployed";
+      step2Status.className = "tx-step-status done";
+
+      createdSuccess = true;
+      txModalActionBtn.disabled = false;
+      txModalActionBtn.classList.add("ready");
+      txModalActionBtn.textContent = "Done";
+    }, 2200));
+  }
+
+  txModalActionBtn.addEventListener("click", () => {
+    if (txModalActionBtn.disabled) return;
+    clearTxTimers();
+    txProgressModal.classList.remove("open");
+    if (createdSuccess) {
+      window.location.href = "organizer_shows.html";
+    }
+  });
+
+  document.getElementById("createEventForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const showName = document.getElementById("showNameInput").value.trim();
+    const venue = document.getElementById("venueInput").value.trim();
+
+    if (!showName) {
+      document.getElementById("showNameInput").focus();
+      return;
+    }
+    if (!venue) {
+      document.getElementById("venueInput").focus();
+      return;
+    }
+
+    runCreateEventTx(showName);
+  });
+
+  /* ================= 5. 高性能暗黑翡翠拓扑波浪与星尘背景动效 ================= */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let width, height, dpr;
+  let mouse = { x: -1000, y: -1000 };
+  let smoothMouse = { x: -1000, y: -1000 };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  window.addEventListener("mouseleave", () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+
+  const stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    baseX: Math.random() * width,
+    baseY: Math.random() * height,
+    r: 0.6 + Math.random() * 1.4,
+    alpha: 0.16 + Math.random() * 0.42,
+    vy: -(0.08 + Math.random() * 0.18),
+    phase: Math.random() * Math.PI * 2,
+    isMint: Math.random() > 0.35
+  }));
+
+  const RIBBON_LINES = 18;
+  const RIBBON_SEGS = 64;
+
+  function drawRibbons(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = 0.85;
+
+    const hasMouse = smoothMouse.x > -500;
+
+    for (let i = 0; i < RIBBON_LINES; i++) {
+      const norm = (i / (RIBBON_LINES - 1)) - 0.5;
+      const centerGlow = 1 - Math.abs(norm) * 2;
+
+      ctx.beginPath();
+      for (let s = 0; s <= RIBBON_SEGS; s++) {
+        const u = s / RIBBON_SEGS;
+        const bx = width * (0.25 + u * 0.85);
+        const by = height * (0.95 - u * 0.88);
+
+        const pinch = Math.sin(u * Math.PI * 2 - t * 0.4) * 0.45 + 0.75;
+        const wave = Math.sin(u * 4.2 + t * 0.65 + norm * 3.0) * 48
+                   + Math.cos(u * 6.5 - t * 0.45 + norm * 4.5) * 20;
+        const offset = norm * (height * 0.26) * pinch + wave;
+
+        let px = bx - offset * 0.45;
+        let py = by + offset * 0.85;
+
+        if (hasMouse) {
+          const dx = px - smoothMouse.x;
+          const dy = py - smoothMouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 48400 && distSq > 0.01) {
+            const dist = Math.sqrt(distSq);
+            const f = Math.pow(1 - dist / 220, 2) * 24;
+            px += (dx / dist) * f;
+            py += (dy / dist) * f;
+          }
+        }
+
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+
+      const alpha = 0.024 + centerGlow * 0.075;
+      ctx.strokeStyle = `rgba(110, 231, 183, ${alpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  let time = 0;
+  let lastFrameTime = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    if (txProgressModal.classList.contains("open") && now - lastFrameTime < 50) return;
+    lastFrameTime = now;
+
+    time += 0.015;
+    ctx.clearRect(0, 0, width, height);
+
+    smoothMouse.x += (mouse.x - smoothMouse.x) * 0.08;
+    smoothMouse.y += (mouse.y - smoothMouse.y) * 0.08;
+
+    drawRibbons(time);
+
+    const hasMouse = smoothMouse.x > -500;
+
+    stars.forEach(s => {
+      s.phase += 0.02;
+      s.baseY += s.vy;
+      if (s.baseY < -10) {
+        s.baseY = height + 10;
+        s.y = s.baseY;
+      }
+
+      let targetX = s.baseX;
+      let targetY = s.baseY;
+
+      if (hasMouse) {
+        const dx = s.x - smoothMouse.x;
+        const dy = s.y - smoothMouse.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 32400 && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const push = Math.pow(1 - dist / 180, 2) * 35;
+          targetX += (dx / dist) * push;
+          targetY += (dy / dist) * push;
+        }
+      }
+
+      s.x += (targetX - s.x) * 0.08;
+      s.y += (targetY - s.y) * 0.08;
+
+      const a = s.alpha * (0.65 + 0.35 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.isMint
+        ? `rgba(167, 243, 208, ${a.toFixed(3)})`
+        : `rgba(255, 255, 255, ${(a * 0.8).toFixed(3)})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>
